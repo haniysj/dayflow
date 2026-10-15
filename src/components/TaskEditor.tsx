@@ -44,6 +44,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
     busy.current = true
     const orig = (task as Task).dueDate
     const rescheduled = !isNew && orig && t.dueDate !== orig
+    onClose()
     await save('tasks', {
       ...t, title,
       rescheduleCount: (t.rescheduleCount || 0) + (rescheduled ? 1 : 0),
@@ -54,7 +55,6 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
     })
     scheduleSoon()
     toast(isNew ? L('أُضيفت المهمة', 'Task added') : L('تم الحفظ', 'Saved'))
-    onClose()
   }
 
   async function del() {

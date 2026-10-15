@@ -48,6 +48,7 @@ export function EventEditor({ ev, instanceDate, onClose }: { ev: CalEvent | Part
     // duplicate guard: same title + date + start time already exists
     const dupe = (await db.events.where('date').equals(date).toArray()).find(x => !x.deleted && x.id !== e.id && x.title.trim() === title && (x.allDay ? e.allDay : x.startTime === e.startTime))
     if (dupe && isNew && !(await confirmDialog({ title: L('موعد مشابه موجود', 'Similar event exists'), body: L('يوجد موعد بنفس العنوان والوقت. هل تريد إضافته مع ذلك؟', 'An event with the same title and time already exists. Add anyway?'), ok: L('إضافة', 'Add') }))) return
+    onClose()
     const clean = { ...e, title, endDate: e.endDate && e.endDate > date ? e.endDate : null, startTime: e.allDay ? null : e.startTime, endTime: e.allDay ? null : e.endTime }
     if (recurringInstance && scope === 'one') {
       const series = (await db.events.get(e.id))!
@@ -58,7 +59,6 @@ export function EventEditor({ ev, instanceDate, onClose }: { ev: CalEvent | Part
     }
     scheduleSoon()
     toast(isNew ? L('أُضيف الموعد', 'Event added') : L('تم الحفظ', 'Saved'))
-    onClose()
   }
 
   async function del() {

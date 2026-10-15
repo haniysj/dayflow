@@ -2,7 +2,7 @@ import {
   BarChart3, CalendarDays, ChevronsLeft, ChevronsRight, CloudOff, FolderKanban, LayoutGrid, ListTodo, Menu as MenuIcon, Palmtree,
   Plus, RefreshCw, Search, Settings as Cog, Sun, Check, AlertTriangle, X, Bell,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ctx, type AppCtx, type QuickAddDefaults, type View } from './app-context'
 import { EventEditor } from './components/EventEditor'
 import { QuickAdd } from './components/QuickAdd'
@@ -54,6 +54,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('df-side') === '1')
   const [modal, setModal] = useState<null | { kind: 'task'; t: Task | Partial<Task> } | { kind: 'event'; e: CalEvent | Partial<CalEvent>; d?: string } | { kind: 'quick'; d: QuickAddDefaults } | { kind: 'search' } | { kind: 'reminders' } | { kind: 'plan' } | { kind: 'review'; date: string } | { kind: 'more' }>(null)
   const [, force] = useState(0)
+  const closedAt = useRef(0)
   const [unread, setUnread] = useState(() => centerItems().filter(i => !i.dismissed).length)
   useEffect(() => onCenter(() => setUnread(centerItems().filter(i => !i.dismissed).length)), [])
 
@@ -81,7 +82,7 @@ export default function App() {
       const { instanceDate, spanStart, spanEnd, ...base } = e as any
       setModal({ kind: 'event', e: base, d: d || instanceDate })
     },
-    quickAdd: (d = {}) => setModal({ kind: 'quick', d }),
+    quickAdd: (d = {}) => { if (Date.now() - closedAt.current > 600) setModal({ kind: 'quick', d }) },
     openSearch: () => setModal({ kind: 'search' }),
     openReminders: () => setModal({ kind: 'reminders' }),
     openPlanTomorrow: () => setModal({ kind: 'plan' }),
@@ -120,7 +121,7 @@ export default function App() {
       if (e.metaKey || e.ctrlKey) { if (e.key.toLowerCase() === 'k') { e.preventDefault(); setModal({ kind: 'search' }) } return }
       if (e.altKey) return
       const key = e.key.toLowerCase()
-      if (key === 'n' || key === 'ى') { e.preventDefault(); setModal({ kind: 'quick', d: {} }) }
+      if (key === 'n' || key === 'ى') { e.preventDefault(); if (Date.now() - closedAt.current > 600) setModal({ kind: 'quick', d: {} }) }
       else if (key === '/') { e.preventDefault(); setModal({ kind: 'search' }) }
       else if (/^[1-7]$/.test(key)) go(NAV[+key - 1].v)
       else if (key === 't') go('today')
@@ -137,7 +138,7 @@ export default function App() {
   useEffect(() => onLocalChange(() => { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1600) }), [])
   useEffect(() => { const t = setInterval(() => force(x => x + 1), 60000); return () => clearInterval(t) }, [])
 
-  const close = () => setModal(null)
+  const close = () => { closedAt.current = Date.now(); setModal(null) }
   const title = NAV.find(n => n.v === view)!
 
   const Page = { today: Today, calendar: CalendarPage, tasks: TasksPage, categories: CategoriesPage, leave: LeavePage, reports: ReportsPage, settings: SettingsPage }[view]
@@ -147,7 +148,7 @@ export default function App() {
       <div className="app">
         <aside className={`side${collapsed ? ' collapsed' : ''}`} aria-label={L('التنقل الرئيسي', 'Main navigation')}>
           <div className="brand"><BrandMark /><div className="brand-text"><b>{settings.appName}</b><span>{L('مخططي الشخصي', 'My personal planner')}</span></div></div>
-          <button className="btn primary side-add" onClick={() => setModal({ kind: 'quick', d: {} })} title={L('إضافة (N)', 'Add (N)')}><Plus size={18} /><span className="side-label">{L('إضافة', 'Add')}</span></button>
+          <button className="btn primary side-add" onClick={() => ctx.quickAdd()} title={L('إضافة (N)', 'Add (N)')}><Plus size={18} /><span className="side-label">{L('إضافة', 'Add')}</span></button>
           {NAV.map((n, i) => (
             <button key={n.v} className={`nav-btn${view === n.v ? ' active' : ''}`} onClick={() => go(n.v)} aria-current={view === n.v ? 'page' : undefined} title={`${L(n.ar, n.en)} (${i + 1})`}>
               <n.icon size={19} /><span className="side-label">{L(n.ar, n.en)}</span>
@@ -173,7 +174,7 @@ export default function App() {
               </button>
               <button className={`btn icon sm${view === 'settings' ? ' accent' : ''}`} onClick={() => go('settings')} aria-label={L('الإعدادات', 'Settings')} title={L('الإعدادات', 'Settings')}><Cog size={17} /></button>
             </div>
-            <button className="btn primary sm hide-m" onClick={() => setModal({ kind: 'quick', d: {} })}><Plus size={16} />{L('إضافة', 'Add')}</button>
+            <button className="btn primary sm hide-m" onClick={() => ctx.quickAdd()}><Plus size={16} />{L('إضافة', 'Add')}</button>
           </header>
           <main className="content" key={view}>
             <Page />
@@ -183,7 +184,7 @@ export default function App() {
 
         <nav className="bottom-nav" aria-label={L('التنقل', 'Navigation')}>
           {NAV.slice(0, 2).map(n => <button key={n.v} className={`bn${view === n.v ? ' active' : ''}`} onClick={() => go(n.v)} aria-current={view === n.v ? 'page' : undefined}><n.icon size={21} />{L(n.ar, n.en)}</button>)}
-          <div style={{ display: 'grid' }}><button className="bn-add" onClick={() => setModal({ kind: 'quick', d: {} })} aria-label={L('إضافة سريعة', 'Quick add')}><Plus size={26} /></button></div>
+          <div style={{ display: 'grid' }}><button className="bn-add" onClick={() => ctx.quickAdd()} aria-label={L('إضافة سريعة', 'Quick add')}><Plus size={26} /></button></div>
           {NAV.slice(2, 3).map(n => <button key={n.v} className={`bn${view === n.v ? ' active' : ''}`} onClick={() => go(n.v)} aria-current={view === n.v ? 'page' : undefined}><n.icon size={21} />{L(n.ar, n.en)}</button>)}
           <button className={`bn${['categories', 'leave', 'reports', 'settings'].includes(view) ? ' active' : ''}`} onClick={() => setModal({ kind: 'more' })}><MenuIcon size={21} />{L('المزيد', 'More')}</button>
         </nav>

@@ -61,7 +61,12 @@ export function Modal({ title, icon, onClose, children, footer, wide, labelledBy
     }
     document.addEventListener('keydown', key, true)
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', key, true); document.body.style.overflow = ''; prev?.focus?.() }
+    return () => {
+      document.removeEventListener('keydown', key, true)
+      document.body.style.overflow = ''
+      if (window.matchMedia?.('(pointer: fine)').matches) setTimeout(() => { if (document.activeElement === document.body) prev?.focus?.({ preventScroll: true }) }, 250)
+      else (document.activeElement as HTMLElement | null)?.blur?.()
+    }
   }, [])
   return createPortal(
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>

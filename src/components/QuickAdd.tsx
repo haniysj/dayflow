@@ -31,13 +31,16 @@ export function QuickAdd({ defaults, onClose }: { defaults: QuickAddDefaults; on
     if (busy.current) return
     if (!title.trim()) return setErr(L('اكتب شيئاً أولاً', 'Type something first'))
     busy.current = true
-    if (kind === 'note') {
-      await save('notes', { id: ids.note, text: title.trim(), createdAt: Date.now() })
-      toast(L('حُفظت في الوارد', 'Saved to inbox'))
-    } else if (kind === 'event') { await save('events', build()); toast(L('أُضيف الموعد', 'Event added')) }
-    else { await save('tasks', build()); toast(L('أُضيفت المهمة', 'Task added')) }
-    scheduleSoon()
+    const item = kind === 'note' ? { id: ids.note, text: title.trim(), createdAt: Date.now() } : build()
+    // close immediately — saving continues in the background
     onClose()
+    try {
+      await save(kind === 'note' ? 'notes' : kind === 'event' ? 'events' : 'tasks', item as any)
+      toast(kind === 'note' ? L('حُفظت في الوارد', 'Saved to inbox') : kind === 'event' ? L('أُضيف الموعد', 'Event added') : L('أُضيفت المهمة', 'Task added'))
+      scheduleSoon()
+    } catch (e) {
+      toast(L('تعذّر الحفظ — حاول مرة أخرى', 'Could not save — try again'), { err: true })
+    }
   }
   const more = () => {
     onClose()
