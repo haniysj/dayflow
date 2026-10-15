@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Filter, MapPin, Plus, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { ALL_TYPES, buildCalendar, moveGridItem, scheduleTaskAt, type CalFilter } from '../components/calendarData'
 import { typeColor } from '../components/EventEditor'
@@ -40,12 +40,41 @@ export function CalendarPage() {
     onEvent: e => editEvent(e, e.instanceDate), onTask: editTask, onLeave: () => go('leave'), onHoliday: () => go('leave'),
   }), [from, to, events, tasks, leaves, holidays, settings, cats, filter])
 
+  // swipe: in RTL "next" sits to the left, so the finger moves right (and the reverse in LTR)
+  const [slide, setSlide] = useState<'next' | 'prev' | null>(null)
+  const swipeRef = useRef<HTMLDivElement>(null)
+  const stepRef = useRef<(n: number) => void>(() => {})
+  useEffect(() => {
+    const el = swipeRef.current
+    if (!el) return
+    let x0 = 0, y0 = 0, t0 = 0, active = false
+    const start = (e: TouchEvent) => {
+      const t = e.target as HTMLElement
+      if (e.touches.length !== 1 || t.closest('.grip, .rsz, input, select, textarea, .modal')) { active = false; return }
+      active = true; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now()
+    }
+    const end = (e: TouchEvent) => {
+      if (!active) return
+      active = false
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - t0 > 800) return
+      const rtl = document.documentElement.dir === 'rtl'
+      const next = rtl ? dx > 0 : dx < 0
+      stepRef.current(next ? 1 : -1)
+    }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchend', end, { passive: true })
+    return () => { el.removeEventListener('touchstart', start); el.removeEventListener('touchend', end) }
+  }, [view, cursor])
+
   const step = (n: number) => {
+    setSlide(n > 0 ? 'next' : 'prev')
     if (view === 'day') setCursor(addDays(cursor, n))
     else if (view === 'month') setCursor(addMonths(cursor, n))
     else if (view === 'agenda') setCursor(addDays(cursor, 30 * n))
     else setCursor(addDays(cursor, 7 * n))
   }
+  stepRef.current = step
   const title = view === 'month' ? fmtMonth(cursor) : view === 'day' ? fmtLong(cursor) : view === 'agenda' ? `${fmtShort(from)} – ${fmtShort(to)}` : `${fmtShort(dates[0])} – ${fmtShort(dates[dates.length - 1])}`
   const prevIcon = document.documentElement.dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />
   const nextIcon = document.documentElement.dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />
@@ -57,7 +86,7 @@ export function CalendarPage() {
         <div className="row wrap" style={{ gap: 8 }}>
           <div className="row" style={{ gap: 4 }}>
             <button className="btn icon sm" onClick={() => step(-1)} aria-label={L('السابق', 'Previous')}>{prevIcon}</button>
-            <button className="btn sm" onClick={() => setCursor(today)}>{L('اليوم', 'Today')}</button>
+            <button className="btn sm" onClick={() => { setSlide(null); setCursor(today) }}>{L('اليوم', 'Today')}</button>
             <button className="btn icon sm" onClick={() => step(1)} aria-label={L('التالي', 'Next')}>{nextIcon}</button>
           </div>
           <h2 className="grow" style={{ fontSize: 17, minWidth: 150 }}>{title}{settings.showHijri && view === 'day' && <span className="small muted" style={{ fontWeight: 500 }}> · {hijri(cursor)}</span>}</h2>
@@ -91,6 +120,7 @@ export function CalendarPage() {
         )}
       </div>
 
+      <div ref={swipeRef} className={slide ? `slide-${slide}` : undefined} key={`${view}-${cursor}`} style={{ touchAction: 'pan-y' }}>
       {(view === 'day' || view === 'week' || view === 'workweek') && (
         <div className="card" style={{ padding: 0, overflow: 'clip' }}>
           {view === 'day' && <div className="row" style={{ padding: '10px 14px', borderBottom: '1px solid var(--line)' }}><DateBadge date={cursor} sm /><b>{relDay(cursor)}</b>{!settings.workdays.includes(dow(cursor)) && <span className="pill">{L('عطلة نهاية الأسبوع', 'Weekend')}</span>}</div>}
@@ -124,7 +154,8 @@ export function CalendarPage() {
       )}
 
       {view === 'agenda' && <Agenda dates={dates} data={data} />}
-      <p className="tiny muted" style={{ margin: 0 }}>{L('الأسبوع يبدأ يوم الأحد، والجمعة والسبت عطلة نهاية الأسبوع (قابل للتعديل من الإعدادات). العطل ذات الإطار المنقّط تواريخ تقديرية.', 'Weeks start on Sunday; Friday and Saturday are the weekend (configurable in Settings). Dashed holidays are estimated dates.')}</p>
+      </div>
+      <p className="tiny muted" style={{ margin: 0 }}>{L('الأسبوع يبدأ يوم الأحد، والجمعة والسبت عطلة نهاية الأسبوع (قابل للتعديل من الإعدادات). العطل ذات الإطار المنقّط تواريخ تقديرية.', 'Weeks start on Sunday; Friday and Saturday are the weekend (configurable in Settings). Dashed holidays are estimated dates.')}<span className="swipe-hint"> {L('اسحب بإصبعك يميناً أو يساراً للتنقل.', 'Swipe left or right to move between periods.')}</span></p>
     </div>
   )
 }

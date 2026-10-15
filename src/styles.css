@@ -338,3 +338,13 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 :root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg) } }
 .input { unicode-bidi: plaintext; }
+
+/* calendar swipe: content enters from the side the user swiped toward */
+@keyframes slideFromEnd { from { opacity: .3; transform: translateX(28px) } }
+@keyframes slideFromStart { from { opacity: .3; transform: translateX(-28px) } }
+.slide-next { animation: slideFromEnd .22s ease; }
+.slide-prev { animation: slideFromStart .22s ease; }
+[dir="rtl"] .slide-next { animation-name: slideFromStart; }
+[dir="rtl"] .slide-prev { animation-name: slideFromEnd; }
+.swipe-hint { display: none; }
+@media (hover: none) and (pointer: coarse) { .swipe-hint { display: inline; } }

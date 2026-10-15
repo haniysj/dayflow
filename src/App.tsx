@@ -1,6 +1,6 @@
 import {
   BarChart3, CalendarDays, ChevronsLeft, ChevronsRight, CloudOff, FolderKanban, LayoutGrid, ListTodo, Menu as MenuIcon, Palmtree,
-  Plus, RefreshCw, Search, Settings as Cog, Sun, Check, AlertTriangle, X,
+  Plus, RefreshCw, Search, Settings as Cog, Sun, Check, AlertTriangle, X, Bell,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Ctx, type AppCtx, type QuickAddDefaults, type View } from './app-context'
@@ -11,7 +11,7 @@ import { BrandMark, ConfirmHost, Modal, Toasts, toast } from './components/ui'
 import { setFormat, setTimeZone, todayStr, fmtMed } from './lib/dates'
 import { db, getLastSaved, onLocalChange, updateSettings, useSettings } from './lib/db'
 import { L, setLang } from './lib/i18n'
-import { setOnFire } from './lib/notify'
+import { centerItems, onCenter, setOnFire } from './lib/notify'
 import { onSync, getToken, syncNow } from './lib/sync'
 import type { CalEvent, Task } from './lib/types'
 import { CalendarPage } from './pages/CalendarPage'
@@ -54,6 +54,8 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('df-side') === '1')
   const [modal, setModal] = useState<null | { kind: 'task'; t: Task | Partial<Task> } | { kind: 'event'; e: CalEvent | Partial<CalEvent>; d?: string } | { kind: 'quick'; d: QuickAddDefaults } | { kind: 'search' } | { kind: 'reminders' } | { kind: 'plan' } | { kind: 'review'; date: string } | { kind: 'more' }>(null)
   const [, force] = useState(0)
+  const [unread, setUnread] = useState(() => centerItems().filter(i => !i.dismissed).length)
+  useEffect(() => onCenter(() => setUnread(centerItems().filter(i => !i.dismissed).length)), [])
 
   useEffect(() => {
     const r = document.documentElement
@@ -164,7 +166,13 @@ export default function App() {
             <h1 className="grow ellipsis"><span className="hide-m">{L(title.ar, title.en)}</span><span className="show-m">{view === 'today' ? settings.appName : L(title.ar, title.en)}</span></h1>
             <SyncBadge state={sync.state} saved={savedFlash} lastSync={sync.lastSync} onClick={() => (getToken() ? syncNow() : go('settings', { tab: 'sync' }))} />
             <span className="pill hide-m nowrap">{fmtMed(todayStr())}</span>
-            <button className="btn icon sm" onClick={() => setModal({ kind: 'search' })} aria-label={L('بحث', 'Search')} title={L('بحث (/)', 'Search (/)')}><Search size={17} /></button>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn icon sm" onClick={() => setModal({ kind: 'search' })} aria-label={L('بحث', 'Search')} title={L('بحث (/)', 'Search (/)')}><Search size={17} /></button>
+              <button className="btn icon sm" onClick={() => setModal({ kind: 'reminders' })} aria-label={unread ? L(`مركز التذكيرات، ${unread} جديدة`, `Reminder center, ${unread} new`) : L('مركز التذكيرات', 'Reminder center')} title={L('التذكيرات', 'Reminders')} style={{ position: 'relative' }}>
+                <Bell size={17} />{unread > 0 && <span className="pill rose" style={{ position: 'absolute', top: -7, insetInlineEnd: -7, padding: '0 6px', fontSize: 11, lineHeight: 1.6 }}>{unread}</span>}
+              </button>
+              <button className={`btn icon sm${view === 'settings' ? ' accent' : ''}`} onClick={() => go('settings')} aria-label={L('الإعدادات', 'Settings')} title={L('الإعدادات', 'Settings')}><Cog size={17} /></button>
+            </div>
             <button className="btn primary sm hide-m" onClick={() => setModal({ kind: 'quick', d: {} })}><Plus size={16} />{L('إضافة', 'Add')}</button>
           </header>
           <main className="content" key={view}>

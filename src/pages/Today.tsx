@@ -1,6 +1,6 @@
 import {
   Archive, ArrowRight, Bell, CalendarCheck2, CalendarClock, CalendarPlus, CheckCircle2, Clock, FolderPlus, Inbox, ListPlus, MoonStar,
-  Plus, Search, Settings as Cog, Star, StickyNote, Sunrise, Trash2, UserRound, X, Pencil,
+  Plus, Search, Star, StickyNote, Sunrise, Trash2, UserRound, X, Pencil,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useApp } from '../app-context'
@@ -13,12 +13,12 @@ import { addDays, dow, fmtDuration, fmtLong, fmtTime, hijri, hmToMin, msToDate, 
 import { patch, remove, save, uid, useCategories, useDay, useEvents, useHolidays, useLeaves, useNotes, useProjects, useTasks } from '../lib/db'
 import { L, PRIORITY_LABEL } from '../lib/i18n'
 import { expandEvents, isOpen, isOverdue, newEvent, setPriority } from '../lib/logic'
-import { centerItems, scheduleSoon } from '../lib/notify'
+import { scheduleSoon } from '../lib/notify'
 import type { Note, PrioritySlot, Task } from '../lib/types'
 
 export function Today() {
   const app = useApp()
-  const { settings, editTask, editEvent, openReminders, go, openPlanTomorrow, openReview, quickAdd } = app
+  const { settings, editTask, editEvent, go, openPlanTomorrow, openReview, quickAdd } = app
   const today = todayStr()
   const tomorrow = addDays(today, 1)
   const tasks = useTasks() || []
@@ -50,7 +50,6 @@ export function Today() {
   const tomorrowEvents = expandEvents(events, tomorrow, tomorrow, settings.workdays)
   const tomorrowTasks = tasks.filter(t => t.dueDate === tomorrow && isOpen(t))
   const inbox = notes.filter(n => !n.archived)
-  const unread = centerItems().filter(i => !i.dismissed).length
   const hour = +minToHM(nowM).slice(0, 2)
   const greeting = hour < 12 ? L('صباح الخير', 'Good morning') : hour < 17 ? L('مساء الخير', 'Good afternoon') : L('مساء الخير', 'Good evening')
   const [schedFor, setSchedFor] = useState<Task | null>(null)
@@ -70,12 +69,6 @@ export function Today() {
           <div className="row" style={{ gap: 12 }}>
             <div className="ring" style={{ ['--p' as any]: pct }} role="img" aria-label={L(`نسبة الإنجاز ${pct}%`, `${pct}% complete`)}>
               <div><span className="ltr">{pct}%</span></div>
-            </div>
-            <div className="col" style={{ gap: 4 }}>
-              <button className="btn icon sm" onClick={openReminders} aria-label={L('مركز التذكيرات', 'Reminder center')} title={L('التذكيرات', 'Reminders')} style={{ position: 'relative' }}>
-                <Bell size={17} />{unread > 0 && <span className="pill rose" style={{ position: 'absolute', top: -7, insetInlineEnd: -7, padding: '0 6px', fontSize: 11 }}>{unread}</span>}
-              </button>
-              <button className="btn icon sm" onClick={() => go('settings')} aria-label={L('الإعدادات', 'Settings')} title={L('الإعدادات', 'Settings')}><Cog size={17} /></button>
             </div>
           </div>
         </div>
