@@ -85,7 +85,7 @@ function LeaveEditor({ leave, holidays, onClose }: { leave: Leave; holidays: Hol
       const t = newTask({ title, dueDate: addDays(l.start, -1), status: 'planned', reminders: [] })
       await save('tasks', t); prepIds.push(t.id)
     }
-    await save('leaves', { ...l, workingDays: days, prepTaskIds: prepIds })
+    await save('leaves', { ...l, demo: false, workingDays: days, prepTaskIds: prepIds })
     scheduleSoon()
     toast(L('حُفظت الإجازة', 'Leave saved'))
     onClose()

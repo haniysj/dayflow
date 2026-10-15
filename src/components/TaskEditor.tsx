@@ -46,7 +46,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
     const rescheduled = !isNew && orig && t.dueDate !== orig
     onClose()
     await save('tasks', {
-      ...t, title,
+      ...t, title, demo: false,
       rescheduleCount: (t.rescheduleCount || 0) + (rescheduled ? 1 : 0),
       links: (t.links || []).map(l => l.trim()).filter(Boolean),
       subtasks: (t.subtasks || []).filter(s => s.title.trim()),
@@ -76,7 +76,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
   }
 
   async function duplicate() {
-    await save('tasks', { ...t, id: uid(), createdAt: Date.now(), status: t.dueDate ? 'planned' : 'inbox', completedAt: null, title: t.title + L(' (نسخة)', ' (copy)') })
+    await save('tasks', { ...t, demo: false, id: uid(), createdAt: Date.now(), status: t.dueDate ? 'planned' : 'inbox', completedAt: null, title: t.title + L(' (نسخة)', ' (copy)') })
     toast(L('أُنشئت نسخة', 'Duplicated'))
     onClose()
   }

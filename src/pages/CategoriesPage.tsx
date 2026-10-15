@@ -197,7 +197,7 @@ function ProjectEditor({ project, tasks, onClose }: { project: Project; tasks: T
   const ts = tasks.filter(t => t.projectId === p.id)
   const submit = async (close = true) => {
     if (!p.name.trim()) { toast(L('اكتب اسم المشروع', 'Enter a project name'), { err: true }); return false }
-    await save('projects', { ...p, name: p.name.trim(), milestones: p.milestones.filter(m => m.title.trim()) })
+    await save('projects', { ...p, demo: false, name: p.name.trim(), milestones: p.milestones.filter(m => m.title.trim()) })
     if (close) onClose()
     return true
   }

@@ -65,6 +65,9 @@ export async function mergeOfficialHolidays() {
   if (missing.length) await saveMany('holidays', missing)
 }
 
+/** Titles used by seedDemo — a demo-flagged record whose title differs was renamed by the user and is real data */
+export const DEMO_TITLES = new Set(['آخر موعد لتسليم خطة الفصل', 'إرسال كشف الحضور الأسبوعي', 'إعداد محضر اجتماع لجنة الجودة', 'اجتماع لجنة المناهج', 'استراحة', 'الاجتماع الأسبوعي للقسم', 'الرد على مراسلة مديرية الموارد البشرية', 'تحديث ملف الإنجاز المهني', 'تحضير عرض ورشة استراتيجيات القراءة', 'جلسة تركيز: كتابة التقرير', 'زيارة صفية — مدرسة الخوض', 'عشاء عائلي عند بيت العم', 'قراءة تقرير نتائج التقويم التكويني', 'متابعة طلب الصيانة لقاعة التدريب', 'مراجعة مسودة خطة التدريب مع أ. سالم البلوشي', 'خطة التطوير المهني للفصل الثاني'])
+
 const nextWorkday = (d: string, n = 1) => { let x = d; let k = 0; while (k < n) { x = addDays(x, 1); if (![5, 6].includes(dow(x))) k++ } return x }
 
 export async function seedDemo(cats?: Category[]) {
