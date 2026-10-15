@@ -1,5 +1,5 @@
 import { CalendarPlus, ListPlus, StickyNote, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useApp, type QuickAddDefaults } from '../app-context'
 import { addDays, hmToMin, minToHM, startOfWeek, todayStr } from '../lib/dates'
 import { save, uid, useCategories } from '../lib/db'
@@ -18,16 +18,21 @@ export function QuickAdd({ defaults, onClose }: { defaults: QuickAddDefaults; on
   const [time, setTime] = useState(defaults.time || '')
   const [cat, setCat] = useState(defaults.categoryId || '')
   const [err, setErr] = useState('')
+  // one id per dialog: a double tap / double Enter overwrites the same record instead of creating a copy
+  const ids = useRef({ task: uid(), event: uid(), note: uid() }).current
+  const busy = useRef(false)
 
   const endFor = (t: string) => defaults.endTime || minToHM(hmToMin(t) + 60)
   const build = () => {
-    if (kind === 'event') return newEvent({ title: title.trim(), date: date || today, allDay: !time, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, reminders: settings.defaultReminders })
-    return newTask({ title: title.trim(), dueDate: date, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, projectId: defaults.projectId || null, reminders: date ? settings.defaultReminders : [] })
+    if (kind === 'event') return newEvent({ id: ids.event, title: title.trim(), date: date || today, allDay: !time, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, reminders: settings.defaultReminders })
+    return newTask({ id: ids.task, title: title.trim(), dueDate: date, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, projectId: defaults.projectId || null, reminders: date ? settings.defaultReminders : [] })
   }
   async function submit() {
+    if (busy.current) return
     if (!title.trim()) return setErr(L('اكتب شيئاً أولاً', 'Type something first'))
+    busy.current = true
     if (kind === 'note') {
-      await save('notes', { id: uid(), text: title.trim(), createdAt: Date.now() })
+      await save('notes', { id: ids.note, text: title.trim(), createdAt: Date.now() })
       toast(L('حُفظت في الوارد', 'Saved to inbox'))
     } else if (kind === 'event') { await save('events', build()); toast(L('أُضيف الموعد', 'Event added')) }
     else { await save('tasks', build()); toast(L('أُضيفت المهمة', 'Task added')) }
@@ -62,7 +67,7 @@ export function QuickAdd({ defaults, onClose }: { defaults: QuickAddDefaults; on
         {kind === 'note'
           ? <textarea className="input" autoFocus value={title} onChange={e => { setTitle(e.target.value); setErr('') }} placeholder={L('فكرة، طلب، تذكير… دون تصنيف أو تاريخ', 'Idea, request, reminder… no category or date needed')}
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit() }} />
-          : <input className="input" autoFocus value={title} onChange={e => { setTitle(e.target.value); setErr('') }} onKeyDown={e => e.key === 'Enter' && submit()}
+          : <input className="input" autoFocus value={title} onChange={e => { setTitle(e.target.value); setErr('') }} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.repeat) { e.preventDefault(); submit() } }}
               placeholder={kind === 'task' ? L('عنوان المهمة', 'Task title') : L('عنوان الموعد', 'Event title')} />}
       </label>
       {kind !== 'note' && <>

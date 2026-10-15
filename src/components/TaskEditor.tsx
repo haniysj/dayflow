@@ -1,5 +1,5 @@
 import { CalendarDays, CheckCircle2, Copy, Link2, ListChecks, Plus, Repeat, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { addDays, isValidDate, isValidTime, startOfWeek, todayStr, hmToMin, fmtShort } from '../lib/dates'
 import { remove, save, uid, useCategories, useProjects } from '../lib/db'
@@ -18,6 +18,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
   const [t, setT] = useState<Task>(() => (isNew ? newTask({ reminders: settings.defaultReminders, ...task }) : { ...(task as Task) }))
   const [err, setErr] = useState('')
   const [more, setMore] = useState(!isNew)
+  const busy = useRef(false)
   const up = (c: Partial<Task>) => setT(x => ({ ...x, ...c }))
   const today = todayStr()
 
@@ -31,6 +32,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
   }
 
   async function submit() {
+    if (busy.current) return
     const title = t.title.trim()
     if (!title) return setErr(L('اكتب عنوان المهمة', 'Enter a task title'))
     for (const d of [t.dueDate, t.startDate, t.followUpDate]) if (d && !isValidDate(d)) return setErr(L('تاريخ غير صالح', 'Invalid date'))
@@ -39,6 +41,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
     if (t.startTime && t.endTime && hmToMin(t.endTime) <= hmToMin(t.startTime)) return setErr(L('يجب أن ينتهي الوقت بعد بدايته', 'End time must be after start time'))
     if (t.startTime && !t.dueDate) return setErr(L('الوقت يحتاج إلى تاريخ', 'A time needs a date'))
     if (t.startDate && t.dueDate && t.startDate > t.dueDate) return setErr(L('تاريخ البدء بعد تاريخ الاستحقاق', 'Start date is after the due date'))
+    busy.current = true
     const orig = (task as Task).dueDate
     const rescheduled = !isNew && orig && t.dueDate !== orig
     await save('tasks', {
@@ -98,7 +101,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
       </>}>
       {err && <div className="banner err" role="alert">{err}</div>}
       <label className="field"><span>{L('العنوان', 'Title')} *</span>
-        <input className="input" value={t.title} onChange={e => { up({ title: e.target.value }); setErr('') }} onKeyDown={e => e.key === 'Enter' && submit()} placeholder={L('ماذا تريد أن تنجز؟', 'What needs doing?')} />
+        <input className="input" value={t.title} onChange={e => { up({ title: e.target.value }); setErr('') }} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.repeat) { e.preventDefault(); submit() } }} placeholder={L('ماذا تريد أن تنجز؟', 'What needs doing?')} />
       </label>
       <div className="field"><span>{L('تاريخ الاستحقاق', 'Due date')}</span>
         <div className="row wrap">

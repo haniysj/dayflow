@@ -2,7 +2,7 @@ import {
   Archive, ArrowRight, Bell, CalendarCheck2, CalendarClock, CalendarPlus, CheckCircle2, Clock, FolderPlus, Inbox, ListPlus, MoonStar,
   Plus, Search, Star, StickyNote, Sunrise, Trash2, UserRound, X, Pencil,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { buildCalendar, moveGridItem, scheduleTaskAt } from '../components/calendarData'
 import { Menu, MenuItem, quickComplete, TaskRow } from '../components/TaskRow'
@@ -316,10 +316,11 @@ function InboxCard({ notes }: { notes: Note[] }) {
   const [projFor, setProjFor] = useState<Note | null>(null)
   const list = notes.filter(n => !q || n.text.includes(q))
 
+  const adding = useRef(false)
   const add = async () => {
-    if (!text.trim()) return
-    await save('notes', { id: uid(), text: text.trim(), createdAt: Date.now() })
-    setText('')
+    if (!text.trim() || adding.current) return
+    adding.current = true
+    try { await save('notes', { id: uid(), text: text.trim(), createdAt: Date.now() }); setText('') } finally { adding.current = false }
   }
   const toTask = async (n: Note, projectId?: string) => {
     const id = uid()
@@ -341,7 +342,7 @@ function InboxCard({ notes }: { notes: Note[] }) {
     <section className="card" aria-label={L('الوارد', 'Inbox')}>
       <div className="card-h"><h2><Inbox size={18} />{L('ملاحظات سريعة والوارد', 'Quick notes & inbox')}</h2><span className="spacer" />{notes.length > 4 && <input className="input" style={{ width: 130, minHeight: 34 }} value={q} onChange={e => setQ(e.target.value)} placeholder={L('بحث…', 'Search…')} aria-label={L('بحث في الوارد', 'Search inbox')} />}</div>
       <div className="row">
-        <input className="input" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder={L('سجّل فكرة أو طلباً… بلا تصنيف أو تاريخ', 'Capture a thought… no category or date needed')} aria-label={L('ملاحظة جديدة', 'New note')} />
+        <input className="input" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.repeat) { e.preventDefault(); add() } }} placeholder={L('سجّل فكرة أو طلباً… بلا تصنيف أو تاريخ', 'Capture a thought… no category or date needed')} aria-label={L('ملاحظة جديدة', 'New note')} />
         <button className="btn primary icon" onClick={add} aria-label={L('حفظ', 'Save')}><Plus size={18} /></button>
       </div>
       <div style={{ marginTop: 6 }}>

@@ -1,5 +1,5 @@
 import { CalendarPlus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { hmToMin, isValidDate, isValidTime, minToHM } from '../lib/dates'
 import { db, remove, save, uid, useCategories } from '../lib/db'
@@ -25,11 +25,17 @@ export function EventEditor({ ev, instanceDate, onClose }: { ev: CalEvent | Part
   const recurringInstance = !isNew && !!e.recurrence && !!instanceDate && instanceDate !== e.date
   const [scope, setScope] = useState<'one' | 'all'>(recurringInstance ? 'one' : 'all')
   const [err, setErr] = useState('')
+  const busy = useRef(false)
   const up = (c: Partial<CalEvent>) => setE(x => ({ ...x, ...c }))
   // when editing one occurrence, show that occurrence's date
   const [occDate, setOccDate] = useState(instanceDate || e.date)
 
   async function submit() {
+    if (busy.current) return
+    busy.current = true
+    try { await doSubmit() } finally { busy.current = false }
+  }
+  async function doSubmit() {
     const title = e.title.trim()
     if (!title) return setErr(L('اكتب عنوان الموعد', 'Enter a title'))
     const date = scope === 'one' && e.recurrence ? occDate : e.date
