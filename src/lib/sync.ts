@@ -11,9 +11,21 @@ export const client = () => {
   return (sb ||= createClient(URL!, KEY!, { auth: { persistSession: false } }))
 }
 
-export type SyncState = 'local' | 'syncing' | 'synced' | 'offline' | 'error' | 'auth'
+export type SyncState = 'local' | 'syncing' | 'synced' | 'offline' | 'error' | 'auth' | 'paused'
+
+/** Cloud sync is ON by default on every device; the user can switch it off (per device) in Settings. */
+export const syncEnabled = () => localStorage.getItem('df-sync-off') !== '1'
+export function setSyncEnabled(on: boolean) {
+  if (on) localStorage.removeItem('df-sync-off'); else localStorage.setItem('df-sync-off', '1')
+  if (on) syncNow(); else set({ state: 'paused' })
+  enabledSubs.forEach(f => f(on))
+}
+const enabledSubs = new Set<(on: boolean) => void>()
+export const onSyncEnabled = (f: (on: boolean) => void) => { enabledSubs.add(f); return () => { enabledSubs.delete(f) } }
+/** Should the app ask this device to connect? (sync on, server available, not connected yet) */
+export const needsConnect = () => backendConfigured && syncEnabled() && !getToken()
 interface SyncInfo { state: SyncState; lastSync: number | null; error?: string; pending: number }
-let info: SyncInfo = { state: 'local', lastSync: Number(localStorage.getItem('df-last-sync')) || null, pending: 0 }
+let info: SyncInfo = { state: localStorage.getItem('df-sync-off') === '1' ? 'paused' : 'local', lastSync: Number(localStorage.getItem('df-last-sync')) || null, pending: 0 }
 const subs = new Set<(i: SyncInfo) => void>()
 export const onSync = (fn: (i: SyncInfo) => void) => { subs.add(fn); fn(info); return () => { subs.delete(fn) } }
 const set = (p: Partial<SyncInfo>) => { info = { ...info, ...p }; subs.forEach(f => f(info)) }
@@ -70,6 +82,7 @@ export async function resetLocal() {
 let running: Promise<void> | null = null
 let again = false
 export function syncNow(): Promise<void> {
+  if (!syncEnabled()) { set({ state: 'paused' }); return Promise.resolve() }
   if (!getToken() || !backendConfigured) { set({ state: 'local' }); return Promise.resolve() }
   if (running) { again = true; return running }
   running = doSync().finally(() => { running = null; if (again) { again = false; syncNow() } })
@@ -141,13 +154,13 @@ let timer: number | undefined
 export function startSyncLoop() {
   onLocalChange(() => {
     localStorage.removeItem('df-pristine')
-    if (!getToken()) return
+    if (!getToken() || !syncEnabled()) return
     set({ pending: info.pending + 1 })
     clearTimeout(timer)
     timer = window.setTimeout(syncNow, 1500)
   })
   window.addEventListener('online', () => syncNow())
-  window.addEventListener('offline', () => getToken() && set({ state: 'offline' }))
+  window.addEventListener('offline', () => getToken() && syncEnabled() && set({ state: 'offline' }))
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow() })
   setInterval(() => { if (document.visibilityState === 'visible') syncNow() }, 60000)
   syncNow()

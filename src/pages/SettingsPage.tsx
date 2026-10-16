@@ -15,8 +15,9 @@ import {
 } from '../lib/notify'
 import { clearDemo, hasDemo, seedDemo } from '../lib/seed'
 import {
-  backendConfigured, changePassword, errCode, getSyncInfo, getToken, login, logout, onSync, queueTestPush, resetLocal, serverHasData, serverStatus, setupPassword, syncNow, wipeRemote,
+  backendConfigured, changePassword, errCode, getSyncInfo, getToken, logout, onSync, onSyncEnabled, queueTestPush, setSyncEnabled, syncEnabled, syncNow, wipeRemote,
 } from '../lib/sync'
+import { SyncConnectForm } from '../components/SyncConnect'
 import type { Settings } from '../lib/types'
 
 type Tab = 'general' | 'appearance' | 'notify' | 'sync' | 'calendar' | 'data'
@@ -217,69 +218,45 @@ function Notify({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void }
 function Sync() {
   const [info, setInfo] = useState(getSyncInfo())
   useEffect(() => onSync(setInfo), [])
-  const [has, setHas] = useState<boolean | null>(null)
-  const [pass, setPass] = useState('')
-  const [pass2, setPass2] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+  const [enabled, setEnabled] = useState(syncEnabled())
+  useEffect(() => onSyncEnabled(setEnabled), [])
+  const [, force] = useState(0)
   const logged = !!getToken()
-  useEffect(() => { if (!logged && backendConfigured) serverStatus().then(r => setHas(r.has_password)).catch(e => setErr(errCode(e))) }, [logged])
-  const msg = (c: string) => ({ DF_BADPASS: L('كلمة المرور غير صحيحة', 'Wrong password'), DF_SHORT: L('كلمة المرور قصيرة (6 أحرف على الأقل)', 'Password too short (min 6)'), DF_EXISTS: L('كلمة المرور معيّنة مسبقاً — سجّل الدخول', 'Password already set — sign in'), NETWORK: L('لا يوجد اتصال بالإنترنت', 'No internet connection') } as any)[c] || c
+  const stateText: Record<string, string> = { local: L('غير مربوط', 'Not connected'), syncing: L('جارٍ المزامنة', 'Syncing'), synced: L('متزامن', 'Synced'), offline: L('دون اتصال — ستتم المزامنة لاحقاً', 'Offline — will sync later'), error: L('خطأ', 'Error'), auth: L('انتهت الجلسة — سجّل الدخول', 'Signed out — sign in'), paused: L('موقوفة', 'Off') }
 
-  const afterLogin = async () => {
-    const pristine = !!localStorage.getItem('df-pristine')
-    const remote = await serverHasData()
-    if (remote && pristine) await resetLocal()
-    else if (remote && !pristine) {
-      const c = await confirmDialog({ title: L('يوجد بيانات في السحابة', 'Cloud already has data'), body: L('هل تريد دمج بيانات هذا الجهاز مع السحابة، أم استبدالها ببيانات السحابة فقط؟', 'Merge this device’s data with the cloud, or replace it with the cloud data only?'), ok: '', choices: [{ v: 'merge', l: L('دمج', 'Merge') }, { v: 'replace', l: L('استبدال ببيانات السحابة', 'Use cloud data only'), danger: true }] })
-      if (c === 'replace') await resetLocal()
-    }
-    localStorage.removeItem('df-pristine')
-    await syncNow()
-    toast(L('تم الربط والمزامنة', 'Connected and synced'))
+  const toggle = async (on: boolean) => {
+    if (!on && !(await confirmDialog({
+      title: L('إيقاف المزامنة على هذا الجهاز؟', 'Turn off sync on this device?'),
+      body: L('تبقى بياناتك محفوظة على هذا الجهاز وفي السحابة، لكن التعديلات الجديدة لن تُرسل إلى السحابة ولن تصل من أجهزتك الأخرى، وتتوقف الإشعارات الفورية لهذا الجهاز. يمكنك إعادة التشغيل في أي وقت.', 'Your data stays on this device and in the cloud, but new changes won’t be sent or received and push reminders stop for this device. You can turn it back on any time.'),
+      ok: L('إيقاف المزامنة', 'Turn off sync'), danger: true,
+    }))) return
+    setSyncEnabled(on)
+    toast(on ? L('تم تشغيل المزامنة', 'Sync turned on') : L('أُوقفت المزامنة على هذا الجهاز', 'Sync turned off on this device'))
   }
-  const doSetup = async () => {
-    setErr('')
-    if (pass.length < 6) return setErr(msg('DF_SHORT'))
-    if (pass !== pass2) return setErr(L('كلمتا المرور غير متطابقتين', 'Passwords do not match'))
-    setBusy(true)
-    try { await setupPassword(pass); await afterLogin() } catch (e) { setErr(msg(errCode(e))) }
-    setBusy(false); setPass(''); setPass2('')
-  }
-  const doLogin = async () => {
-    setErr(''); setBusy(true)
-    try { await login(pass); await afterLogin() } catch (e) { setErr(msg(errCode(e))) }
-    setBusy(false); setPass('')
-  }
-  const stateText: Record<string, string> = { local: L('غير متصل', 'Not connected'), syncing: L('جارٍ المزامنة', 'Syncing'), synced: L('متزامن', 'Synced'), offline: L('دون اتصال', 'Offline'), error: L('خطأ', 'Error'), auth: L('انتهت الجلسة', 'Signed out') }
 
   if (!backendConfigured) return <Card title={L('المزامنة', 'Sync')} icon={<Cloud size={18} />}><div className="banner warn">{L('الخادم غير مُعدّ في هذا الإصدار — البيانات محفوظة على هذا الجهاز فقط. صدّر نسخة احتياطية بانتظام.', 'No server configured in this build — data lives on this device only. Export backups regularly.')}</div></Card>
   return (
-    <Card title={L('المزامنة بين الأجهزة', 'Sync across devices')} icon={<Cloud size={18} />}>
-      <p className="small muted" style={{ marginTop: 0 }}>{L('تُحفظ بياناتك أولاً على هذا الجهاز وتعمل دون إنترنت، ثم تُزامَن مع قاعدة بيانات خاصة محمية بكلمة مرور عند الاتصال. يسجّل كل جهاز الدخول مرة واحدة.', 'Data is saved on this device first and works offline, then syncs to a private password-protected database when online. Each device signs in once.')}</p>
-      {err && <div className="banner err small" role="alert">{err}</div>}
-      {logged ? <>
+    <Card title={L('المزامنة مع السحابة', 'Cloud sync')} icon={<Cloud size={18} />}>
+      <p className="small muted" style={{ marginTop: 0 }}>{L('مفعّلة افتراضياً. تُحفظ بياناتك أولاً على هذا الجهاز وتعمل دون إنترنت، ثم تُزامَن مع قاعدة بيانات خاصة محمية بكلمة مرور. يسجّل كل جهاز الدخول مرة واحدة.', 'On by default. Data is saved on this device first and works offline, then syncs to a private password-protected database. Each device signs in once.')}</p>
+      <Row title={L('المزامنة مع السحابة', 'Cloud sync')} hint={enabled ? L('مفعّلة على هذا الجهاز', 'On for this device') : L('موقوفة — البيانات على هذا الجهاز فقط', 'Off — data stays on this device only')}>
+        <Switch label={L('المزامنة مع السحابة', 'Cloud sync')} checked={enabled} onChange={toggle} />
+      </Row>
+      {enabled && (logged ? <>
         <Row title={L('الحالة', 'Status')} hint={info.lastSync ? L('آخر مزامنة: ', 'Last sync: ') + new Date(info.lastSync).toLocaleString() : undefined}>
           <span className={`pill ${info.state === 'synced' ? 'teal' : info.state === 'error' || info.state === 'auth' ? 'rose' : 'saffron'}`}>{stateText[info.state]}</span>
           <button className="btn sm" onClick={() => syncNow()}><RefreshCw size={14} />{L('مزامنة الآن', 'Sync now')}</button>
         </Row>
         <ChangePass />
-        <Row title={L('تسجيل الخروج من هذا الجهاز', 'Sign out of this device')} hint={L('تبقى البيانات على الجهاز، وتتوقف المزامنة والإشعارات الفورية له.', 'Data stays on the device; sync and push stop for it.')}>
-          <button className="btn danger sm" onClick={async () => { if (await confirmDialog({ title: L('تسجيل الخروج؟', 'Sign out?'), ok: L('تسجيل الخروج', 'Sign out'), danger: true })) { await disablePush().catch(() => {}); await logout() } }}><LogOut size={14} />{L('تسجيل الخروج', 'Sign out')}</button>
+        <Row title={L('تسجيل الخروج من هذا الجهاز', 'Sign out of this device')} hint={L('يُلغي ربط الجهاز نهائياً، ويلزم إدخال كلمة المرور لإعادة الربط. البيانات تبقى على الجهاز.', 'Unlinks the device; the password is needed to reconnect. Data stays on the device.')}>
+          <button className="btn danger sm" onClick={async () => { if (await confirmDialog({ title: L('تسجيل الخروج؟', 'Sign out?'), ok: L('تسجيل الخروج', 'Sign out'), danger: true })) { await disablePush().catch(() => {}); await logout(); force(x => x + 1) } }}><LogOut size={14} />{L('تسجيل الخروج', 'Sign out')}</button>
         </Row>
-      </> : has === null ? <p className="muted small">{L('جارٍ التحقق…', 'Checking…')}</p> : has ? (
-        <div className="col">
-          <label className="field"><span>{L('كلمة المرور', 'Password')}</span><input className="input" type="password" autoComplete="current-password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} style={{ maxWidth: 320 }} /></label>
-          <button className="btn primary" style={{ alignSelf: 'flex-start' }} disabled={busy || !pass} onClick={doLogin}><KeyRound size={16} />{L('تسجيل الدخول والمزامنة', 'Sign in & sync')}</button>
+      </> : (
+        <div className="set-row" style={{ display: 'block' }}>
+          <b style={{ display: 'block', marginBottom: 8 }}>{L('ربط هذا الجهاز', 'Connect this device')}</b>
+          <SyncConnectForm onDone={() => force(x => x + 1)} />
         </div>
-      ) : (
-        <div className="col">
-          <div className="banner info small">{L('أول مرة: اختر كلمة مرور خاصة بك لحماية بياناتك في السحابة. ستستخدمها لربط أجهزتك الأخرى.', 'First time: choose a password to protect your cloud data. You’ll use it to link your other devices.')}</div>
-          <label className="field"><span>{L('كلمة مرور جديدة', 'New password')}</span><input className="input" type="password" autoComplete="new-password" value={pass} onChange={e => setPass(e.target.value)} style={{ maxWidth: 320 }} /></label>
-          <label className="field"><span>{L('تأكيد كلمة المرور', 'Confirm password')}</span><input className="input" type="password" autoComplete="new-password" value={pass2} onChange={e => setPass2(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSetup()} style={{ maxWidth: 320 }} /></label>
-          <button className="btn primary" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={doSetup}><ShieldCheck size={16} />{L('إنشاء والمزامنة', 'Create & sync')}</button>
-        </div>
-      )}
+      ))}
+      {!enabled && <div className="banner warn small" style={{ marginTop: 8 }}>{L('المزامنة موقوفة: صدّر نسخة احتياطية قبل تغيير الجهاز أو مسح بيانات المتصفح.', 'Sync is off: export a backup before changing devices or clearing browser data.')}</div>}
     </Card>
   )
 }
@@ -357,7 +334,7 @@ function Data() {
   return (
     <>
       <Card title={L('النسخ الاحتياطي والتصدير', 'Backup & export')} icon={<Download size={18} />}>
-        {!getToken() && <div className="banner warn small" style={{ marginBottom: 8 }}>{L('بياناتك محفوظة على هذا الجهاز فقط حالياً. صدّر نسخة احتياطية قبل تغيير الجهاز أو مسح بيانات المتصفح، أو فعّل المزامنة.', 'Your data is on this device only right now. Export a backup before changing devices or clearing browser data — or turn on sync.')}</div>}
+        {(!getToken() || !syncEnabled()) && <div className="banner warn small" style={{ marginBottom: 8 }}>{L('بياناتك محفوظة على هذا الجهاز فقط حالياً. صدّر نسخة احتياطية قبل تغيير الجهاز أو مسح بيانات المتصفح، أو فعّل المزامنة.', 'Your data is on this device only right now. Export a backup before changing devices or clearing browser data — or turn on sync.')}</div>}
         <Row title={L('نسخة احتياطية كاملة', 'Full backup')} hint={last ? L('آخر نسخة: ', 'Last backup: ') + new Date(last).toLocaleString() : L('لم تُصدَّر نسخة بعد', 'No backup exported yet')}>
           <button className="btn sm" onClick={exportJSON}><FileIcon kind="json" size={17} />{L('تصدير JSON', 'Export JSON')}</button>
           <button className="btn sm" onClick={() => file.current?.click()}><Upload size={15} />{L('استعادة', 'Restore')}</button>

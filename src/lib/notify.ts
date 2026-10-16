@@ -2,7 +2,7 @@ import { addDays, dow, hmToMin, minToHM, range, todayStr, zonedToMs, msToDate, m
 import { alive, db, getSettings, save } from './db'
 import { L } from './i18n'
 import { expandEvents, isOpen } from './logic'
-import { backendConfigured, getToken, pushSubCount, removePushSub, savePushSub, setRemoteSchedule } from './sync'
+import { backendConfigured, getToken, pushSubCount, removePushSub, savePushSub, setRemoteSchedule, syncEnabled } from './sync'
 import type { Settings } from './types'
 
 export interface ReminderItem { id: string; at: number; title: string; body: string; url: string; cat: 'tasks' | 'events' | 'planning' | 'leave' }
@@ -196,7 +196,7 @@ export { pushSubCount }
 let pushTimer: number | undefined
 let lastSent = ''
 export async function pushRemoteSchedule() {
-  if (!getToken() || !backendConfigured) return
+  if (!getToken() || !backendConfigured || !syncEnabled()) return
   const items = lastItems.map(i => ({ id: i.id, at: new Date(i.at).toISOString(), title: i.title, body: i.body, url: i.url }))
   const sig = JSON.stringify(items)
   if (sig === lastSent) return

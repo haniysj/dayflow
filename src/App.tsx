@@ -12,7 +12,8 @@ import { setFormat, setTimeZone, todayStr, fmtMed } from './lib/dates'
 import { db, getLastSaved, onLocalChange, updateSettings, useSettings } from './lib/db'
 import { L, setLang } from './lib/i18n'
 import { centerItems, onCenter, setOnFire } from './lib/notify'
-import { onSync, getToken, syncNow } from './lib/sync'
+import { onSync, getToken, syncNow, needsConnect, setSyncEnabled, onSyncEnabled } from './lib/sync'
+import { SyncConnectPrompt } from './components/SyncConnect'
 import type { CalEvent, Task } from './lib/types'
 import { CalendarPage } from './pages/CalendarPage'
 import { CategoriesPage } from './pages/CategoriesPage'
@@ -55,6 +56,8 @@ export default function App() {
   const [modal, setModal] = useState<null | { kind: 'task'; t: Task | Partial<Task> } | { kind: 'event'; e: CalEvent | Partial<CalEvent>; d?: string } | { kind: 'quick'; d: QuickAddDefaults } | { kind: 'search' } | { kind: 'reminders' } | { kind: 'plan' } | { kind: 'review'; date: string } | { kind: 'more' }>(null)
   const [, force] = useState(0)
   const closedAt = useRef(0)
+  const [askConnect, setAskConnect] = useState(() => needsConnect() && !sessionStorage.getItem('df-connect-later'))
+  useEffect(() => onSyncEnabled(() => setAskConnect(needsConnect() && !sessionStorage.getItem('df-connect-later'))), [])
   const [unread, setUnread] = useState(() => centerItems().filter(i => !i.dismissed).length)
   useEffect(() => onCenter(() => setUnread(centerItems().filter(i => !i.dismissed).length)), [])
 
@@ -165,7 +168,7 @@ export default function App() {
           <header className="topbar">
             <span className="show-m"><BrandMark size={30} /></span>
             <h1 className="grow ellipsis"><span className="hide-m">{L(title.ar, title.en)}</span><span className="show-m">{view === 'today' ? settings.appName : L(title.ar, title.en)}</span></h1>
-            <SyncBadge state={sync.state} saved={savedFlash} lastSync={sync.lastSync} onClick={() => (getToken() ? syncNow() : go('settings', { tab: 'sync' }))} />
+            <SyncBadge state={sync.state} saved={savedFlash} lastSync={sync.lastSync} onClick={() => (getToken() && sync.state !== 'paused' ? syncNow() : go('settings', { tab: 'sync' }))} />
             <span className="pill hide-m nowrap">{fmtMed(todayStr())}</span>
             <div className="row" style={{ gap: 6 }}>
               <button className="btn icon sm" onClick={() => setModal({ kind: 'search' })} aria-label={L('بحث', 'Search')} title={L('بحث (/)', 'Search (/)')}><Search size={17} /></button>
@@ -208,9 +211,15 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {askConnect && !modal && (
+        <SyncConnectPrompt
+          onClose={() => { sessionStorage.setItem('df-connect-later', '1'); setAskConnect(false) }}
+          onDisable={() => { setSyncEnabled(false); setAskConnect(false); toast(L('أُوقفت المزامنة — يمكنك تشغيلها من الإعدادات', 'Sync turned off — turn it on in Settings')) }}
+        />
+      )}
       <ConfirmHost />
       <Toasts />
-      <OnboardingHint show={!settings.onboarded} />
+      <OnboardingHint show={!settings.onboarded && !askConnect} />
     </Ctx.Provider>
   )
 }
@@ -223,9 +232,10 @@ function SyncBadge({ state, saved, lastSync, onClick }: { state: string; saved: 
     offline: ['warn', L('دون اتصال — محفوظ محلياً', 'Offline — saved locally'), L('ستتم المزامنة عند عودة الاتصال', 'Will sync when back online')],
     error: ['err', L('تعذّرت المزامنة', 'Sync failed'), L('اضغط لإعادة المحاولة', 'Tap to retry')],
     auth: ['err', L('سجّل الدخول للمزامنة', 'Sign in to sync'), ''],
+    paused: ['warn', L('المزامنة موقوفة', 'Sync off'), L('فعّلها من الإعدادات', 'Turn it on in Settings')],
   }
   const [cls, label, hint] = map[state] || map.local
-  const Icon = state === 'syncing' ? RefreshCw : state === 'offline' ? CloudOff : state === 'error' || state === 'auth' ? AlertTriangle : Check
+  const Icon = state === 'syncing' ? RefreshCw : state === 'offline' || state === 'paused' ? CloudOff : state === 'error' || state === 'auth' ? AlertTriangle : Check
   return (
     <button className={`status-dot ${cls}`} style={{ border: 0, background: 'none', cursor: 'pointer', padding: '4px 6px' }} onClick={onClick} title={hint} aria-live="polite">
       {saved && state !== 'syncing' ? <><Check size={14} color="var(--teal)" /><span className="hide-m">{L('تم الحفظ', 'Saved')}</span></> : <><Icon size={14} className={state === 'syncing' ? 'spin' : ''} /><span className="vh-m">{label}</span></>}
