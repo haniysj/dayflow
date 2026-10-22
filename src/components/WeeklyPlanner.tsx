@@ -57,8 +57,44 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
     setTimeout(() => { window.print(); setTimeout(done, 1500) }, 60)
   }
 
+  /** Collect the CSS rules the planner sheet uses (".pl-…"), skipping @media print blocks */
+  const plannerCss = () => {
+    const out: string[] = []
+    for (const sheet of Array.from(document.styleSheets)) {
+      let rules: CSSRuleList
+      try { rules = sheet.cssRules } catch { continue }
+      for (const r of Array.from(rules)) if (r instanceof CSSStyleRule && /\.pl-|#pl-print-root/.test(r.selectorText)) out.push(r.cssText)
+    }
+    return out.join('\n')
+  }
+  const fileName = `dayflow-planner-${opts.startWeek}.pdf`
+  const download = (blob: Blob) => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = fileName
+    document.body.appendChild(a); a.click()
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 4000)
+  }
+
+  /** Vector PDF (real text) rendered by the server; image PDF only as an offline fallback */
   const doPdf = async () => {
     setBusy('pdf')
+    try {
+      if (!navigator.onLine) throw new Error('offline')
+      const r = await fetch('/api/pdf', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: printRoot.current?.innerHTML || '', css: plannerCss(), lang: getLang(), name: fileName }),
+      })
+      if (!r.ok || !(r.headers.get('content-type') || '').includes('pdf')) throw new Error('server ' + r.status)
+      download(await r.blob())
+      toast(L('حُفظ ملف PDF', 'PDF saved'))
+    } catch (e) {
+      console.warn('server pdf failed, using image fallback', e)
+      await imagePdf()
+    }
+    setBusy('')
+  }
+
+  const imagePdf = async () => {
     try {
       await document.fonts?.ready
       const [{ jsPDF }, h2c] = await Promise.all([import('jspdf'), import('html2canvas-pro')])
@@ -68,15 +104,14 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
       for (let i = 0; i < pages.length; i++) {
         const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false })
         if (i) pdf.addPage()
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PAGE_W, PAGE_H)
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PAGE_W, PAGE_H, `p${i}`)
       }
-      pdf.save(`dayflow-planner-${opts.startWeek}.pdf`)
-      toast(L('حُفظ ملف PDF', 'PDF saved'))
+      download(pdf.output('blob'))
+      toast(L('حُفظ PDF كصورة (دون اتصال). للحصول على نص واضح أعد الحفظ عند الاتصال بالإنترنت.', 'Saved as an image PDF (offline). Save again when online for crisp text.'), { ms: 6000 })
     } catch (e) {
       console.error(e)
       toast(L('تعذّر إنشاء PDF — جرّب زر الطباعة ثم «حفظ كـ PDF»', 'Could not create PDF — use Print → Save as PDF'), { err: true })
     }
-    setBusy('')
   }
 
   const previewScale = Math.min(0.42, (Math.min(window.innerWidth, 560) - 70) / (PAGE_W * MM))
@@ -145,13 +180,13 @@ function PlannerPages({ sundays, opts }: { sundays: string[]; opts: Opts }) {
       ...hol.map(h => ({ t: (rtl || !h.nameEn ? h.name : h.nameEn) + (h.status === 'estimated' ? L(' (تقديري)', ' (est.)') : ''), c: h.official ? '#2E7D32' : '#AD3B7A' })),
       ...lv.map(l => ({ t: (LEAVE_TYPE_LABEL() as any)[l.type], c: '#8A6100' })),
     ]
-    if (!opts.withItems) return { tags, items: [] as { time: string; text: string; done?: boolean }[] }
+    if (!opts.withItems) return { tags, items: [] as { time: string; text: string; done?: boolean; task?: boolean }[] }
     const ev = expandEvents(events.filter(e => e.type !== 'break'), d, d, settings.workdays)
       .sort((a, b) => (a.allDay ? '' : a.startTime || '').localeCompare(b.allDay ? '' : b.startTime || ''))
-      .map(e => ({ time: e.allDay ? '' : fmtTime(e.startTime), text: e.title, done: false }))
+      .map(e => ({ time: e.allDay ? '' : fmtTime(e.startTime), text: e.title, done: false, task: false }))
     const ts = tasks.filter(t => t.dueDate === d && !['cancelled', 'archived'].includes(t.status))
       .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
-      .map(t => ({ time: t.startTime ? fmtTime(t.startTime) : '', text: '☐ ' + t.title, done: t.status === 'completed' }))
+      .map(t => ({ time: t.startTime ? fmtTime(t.startTime) : '', text: t.title, done: t.status === 'completed', task: true }))
     return { tags, items: [...ev, ...ts] }
   }
 
@@ -197,7 +232,7 @@ function PlannerPages({ sundays, opts }: { sundays: string[]; opts: Opts }) {
                       return (
                         <div key={i} className="pl-line">
                           {tag && tag.map((x, k) => <span key={k} className="pl-tag" style={{ color: x.c, borderColor: x.c }}>{x.t}</span>)}
-                          {!tag && item && !overflow && <span className={item.done ? 'pl-done' : ''}>{item.time && <b className="pl-time">{item.time}</b>}{item.text}</span>}
+                          {!tag && item && !overflow && <span className={item.done ? 'pl-done' : ''}>{item.task && <i className={`pl-box${item.done ? ' on' : ''}`} />}{item.time && <b className="pl-time">{item.time}</b>}{item.text}</span>}
                           {overflow && <span className="pl-more">+{info.items.length - 5} {L('أخرى', 'more')}</span>}
                         </div>
                       )

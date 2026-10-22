@@ -392,6 +392,8 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 .pl-time { font-weight: 800; color: #1F7A6D; margin: 0 1.5mm; unicode-bidi: isolate; white-space: nowrap; }
 .pl-tag { border: 0.25mm solid; border-radius: 5mm; padding: 0 2mm; font-size: 7.5pt; font-weight: 800; }
 .pl-done { text-decoration: line-through; color: #829AB1; }
+.pl-box { display: inline-block; width: 2.6mm; height: 2.6mm; border: 0.3mm solid #334E68; border-radius: 0.5mm; margin: 0 1mm; vertical-align: -0.3mm; flex-shrink: 0; }
+.pl-box.on { background: #1F7A6D; border-color: #1F7A6D; }
 .pl-more { color: #627D98; font-size: 7.5pt; font-weight: 700; }
 .pl-foot { display: flex; justify-content: space-between; font-size: 7pt; color: #829AB1; flex-shrink: 0; }
 
