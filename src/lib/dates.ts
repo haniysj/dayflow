@@ -76,7 +76,12 @@ let LANG: 'ar' | 'en' = 'ar'
 let HOUR12 = true
 let DFMT: 'dmy' | 'ymd' | 'long' = 'long'
 export const setFormat = (lang: 'ar' | 'en', timeFormat: '12' | '24', dateFormat: 'dmy' | 'ymd' | 'long' = 'long') => { LANG = lang; HOUR12 = timeFormat === '12'; DFMT = dateFormat }
-const numeric = (s: string) => (DFMT === 'ymd' ? s : `${s.slice(8)}/${s.slice(5, 7)}/${s.slice(0, 4)}`)
+// Arabic: an RLM after each number makes the parts flow right-to-left, so the reader sees day / month / year from the right
+const RLM = '\u200F'
+const dmy = (parts: string[]) => (LANG === 'ar' ? parts.join(RLM + '/') : parts.join('/'))
+const numeric = (s: string) => (DFMT === 'ymd' ? s : dmy([s.slice(8), s.slice(5, 7), s.slice(0, 4)]))
+/** Full numeric date in the user's reading order (day/month/year; right-to-left in Arabic) */
+export const fmtNumeric = (s: string) => dmy([s.slice(8, 10), s.slice(5, 7), s.slice(0, 4)])
 const loc = () => (LANG === 'ar' ? 'ar-OM-u-nu-latn' : 'en-GB')
 const asDate = (s: string) => new Date(toUTC(s) + 12 * 3600000)
 
@@ -84,7 +89,7 @@ export const fmtDay = (s: string, opts: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat(loc(), { timeZone: 'UTC', ...opts }).format(asDate(s))
 export const fmtLong = (s: string) => fmtDay(s, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 export const fmtMed = (s: string) => (DFMT === 'long' ? fmtDay(s, { weekday: 'short', day: 'numeric', month: 'short' }) : `${fmtDay(s, { weekday: 'short' })} ${numeric(s)}`)
-export const fmtShort = (s: string) => (DFMT === 'long' ? fmtDay(s, { day: 'numeric', month: 'short' }) : DFMT === 'ymd' ? s : `${s.slice(8)}/${s.slice(5, 7)}`)
+export const fmtShort = (s: string) => (DFMT === 'long' ? fmtDay(s, { day: 'numeric', month: 'short' }) : DFMT === 'ymd' ? s : dmy([s.slice(8), s.slice(5, 7)]))
 export const fmtMonth = (s: string) => fmtDay(s, { month: 'long', year: 'numeric' })
 export const weekdayName = (s: string, style: 'long' | 'short' | 'narrow' = 'short') => fmtDay(s, { weekday: style })
 export const monthShort = (s: string) => fmtDay(s, { month: 'short' })

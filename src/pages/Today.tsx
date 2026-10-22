@@ -9,7 +9,7 @@ import { Menu, MenuItem, quickComplete, TaskRow } from '../components/TaskRow'
 import { CheckIcon } from '../components/TaskEditor'
 import { TimeGrid } from '../components/TimeGrid'
 import { catName, confirmDialog, DateBadge, Empty, Modal, toast } from '../components/ui'
-import { addDays, dow, fmtDuration, fmtLong, fmtTime, hijri, hmToMin, msToDate, nowMinutes, relDay, todayStr, minToHM } from '../lib/dates'
+import { addDays, dow, fmtDuration, fmtLong, fmtNumeric, fmtTime, hijri, hmToMin, msToDate, nowMinutes, relDay, todayStr, minToHM } from '../lib/dates'
 import { patch, remove, save, uid, useCategories, useDay, useEvents, useHolidays, useLeaves, useNotes, useProjects, useTasks } from '../lib/db'
 import { L, PRIORITY_LABEL } from '../lib/i18n'
 import { expandEvents, isOpen, isOverdue, newEvent, setPriority } from '../lib/logic'
@@ -356,7 +356,7 @@ function InboxCard({ notes }: { notes: Note[] }) {
                 : <div style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap', cursor: 'text' }} onClick={() => setEditing(n.id)}>{n.text}</div>}
               <div className="row wrap" style={{ gap: 5, marginTop: 2 }}>
                 <span className="tiny muted">{relDay(msToDate(n.createdAt))}</span>
-                {n.remindAt && <span className="pill saffron"><Bell size={11} /><span className="ltr">{n.remindAt.replace('T', ' ')}</span></span>}
+                {n.remindAt && <span className="pill saffron"><Bell size={11} /><span className="iso">{fmtNumeric(n.remindAt.slice(0, 10))} {fmtTime(n.remindAt.slice(11, 16))}</span></span>}
                 {n.demo && <span className="pill outline">{L('تجريبي', 'Demo')}</span>}
               </div>
             </div>

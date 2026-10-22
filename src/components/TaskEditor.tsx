@@ -1,7 +1,7 @@
 import { CalendarDays, CheckCircle2, Copy, Link2, ListChecks, Plus, Repeat, Trash2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
-import { addDays, isValidDate, isValidTime, startOfWeek, todayStr, hmToMin, fmtShort } from '../lib/dates'
+import { addDays, isValidDate, isValidTime, startOfWeek, todayStr, hmToMin, fmtShort, fmtNumeric } from '../lib/dates'
 import { remove, save, uid, useCategories, useProjects } from '../lib/db'
 import { L, PRIORITY_LABEL, REMINDER_OPTIONS, STATUS_LABEL } from '../lib/i18n'
 import { completeTask, newTask, reopenTask } from '../lib/logic'
@@ -108,7 +108,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
           {quickDates.map(([l, d]) => <button key={l} type="button" className={`fchip${t.dueDate === d ? ' on' : ''}`} onClick={() => setDue(d)}>{l}</button>)}
           <input className="input" type="date" style={{ width: 170 }} value={t.dueDate || ''} onChange={e => setDue(e.target.value || null)} aria-label={L('تاريخ الاستحقاق', 'Due date')} />
         </div>
-        {t.originalDueDate && t.originalDueDate !== t.dueDate && <span className="tiny muted">{L('الاستحقاق الأصلي:', 'Original due:')} <span className="ltr">{t.originalDueDate}</span> · {L('أُجّلت', 'moved')} {t.rescheduleCount || 0}×</span>}
+        {t.originalDueDate && t.originalDueDate !== t.dueDate && <span className="tiny muted">{L('الاستحقاق الأصلي:', 'Original due:')} <span className="iso">{fmtNumeric(t.originalDueDate)}</span> · {L('أُجّلت', 'moved')} {t.rescheduleCount || 0}×</span>}
       </div>
       <div className="grid g3">
         <label className="field"><span>{L('الأولوية', 'Priority')}</span>

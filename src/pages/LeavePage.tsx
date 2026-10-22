@@ -2,7 +2,7 @@ import { Bell, BellOff, CheckCircle2, ExternalLink, Palmtree, Pencil, Plus, Tras
 import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { confirmDialog, DateBadge, Empty, FileIcon, Modal, Seg, Switch, toast } from '../components/ui'
-import { addDays, diffDays, fmtMed, fmtShort, relDay, todayStr, hijri } from '../lib/dates'
+import { addDays, diffDays, fmtMed, fmtShort, fmtNumeric, relDay, todayStr, hijri } from '../lib/dates'
 import { remove, save, uid, useHolidays, useLeaves } from '../lib/db'
 import { L, LEAVE_TYPE_LABEL } from '../lib/i18n'
 import { exportHolidays, importHolidays } from '../lib/io'
@@ -28,7 +28,7 @@ export function LeavePage() {
   return (
     <div className="stack view-enter">
       <section className="card">
-        <div className="card-h"><h2><Palmtree size={18} />{L('رصيد الإجازة الاعتيادية', 'Annual leave balance')}</h2><span className="spacer" /><span className="tiny muted ltr nowrap">{yr.start} → {yr.end}</span></div>
+        <div className="card-h"><h2><Palmtree size={18} />{L('رصيد الإجازة الاعتيادية', 'Annual leave balance')}</h2><span className="spacer" /><span className="tiny muted iso nowrap">{fmtNumeric(yr.start)} – {fmtNumeric(yr.end)}</span></div>
         <div className="grid g3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
           <div className="kpi"><b>{allowance ?? '—'}</b><span>{L('الرصيد السنوي', 'Allowance')}{settings.leaveCarryOver ? ` (+${settings.leaveCarryOver} ${L('مرحّل', 'carried')})` : ''}</span></div>
           <div className="kpi"><b>{used}</b><span>{L('مستخدم', 'Used')}</span></div>
@@ -156,7 +156,7 @@ function HolidaysSection({ holidays }: { holidays: Holiday[] }) {
           {L('المرجع الرسمي: البوابة الحكومية الموحدة ', 'Authoritative source: Oman government portal ')}
           <a href="https://gov.om/en/important-dates-and-holidays" target="_blank" rel="noopener noreferrer">gov.om <ExternalLink size={11} /></a>
           {L(' وقرارات مجلس الوزراء. لا توجد مزامنة آلية — تُحدَّث البيانات يدوياً أو باستيراد ملف. تواريخ الأعياد تتبع رؤية الهلال، والتواريخ «التقديرية» ليست رسمية حتى يُعلن عنها.', ' and Council of Ministers announcements. There is no live sync — update manually or import a file. Eid dates follow moon sighting; “estimated” dates are not official until announced.')}
-          {lastVerified && <div className="tiny" style={{ marginTop: 4 }}>{L('آخر تحقق:', 'Last verified:')} <span className="ltr">{lastVerified}</span></div>}
+          {lastVerified && <div className="tiny" style={{ marginTop: 4 }}>{L('آخر تحقق:', 'Last verified:')} <span className="iso">{fmtNumeric(lastVerified)}</span></div>}
         </div>
       </div>
       <div className="row wrap" style={{ marginBottom: 8 }}>
@@ -179,7 +179,7 @@ function HolidaysSection({ holidays }: { holidays: Holiday[] }) {
               {!h.official && <span className="pill outline">{L('مناسبة شخصية', 'Personal')}</span>}
               {h.start >= today && <span className="tiny muted">{relDay(h.start)}</span>}
             </div>
-            <div className="tiny muted">{h.source}{h.sourceUrl && <> · <a href={h.sourceUrl} target="_blank" rel="noopener noreferrer">{L('المصدر', 'source')}</a></>}{h.verifiedAt ? ` · ${L('تحقق', 'verified')} ${h.verifiedAt}` : ''} · {hijri(h.start)}</div>
+            <div className="tiny muted">{h.source}{h.sourceUrl && <> · <a href={h.sourceUrl} target="_blank" rel="noopener noreferrer">{L('المصدر', 'source')}</a></>}{h.verifiedAt ? ` · ${L('تحقق', 'verified')} ${fmtNumeric(h.verifiedAt)}` : ''} · {hijri(h.start)}</div>
           </div>
           <button className="btn ghost icon sm" onClick={async () => { await save('holidays', { ...h, remind: !h.remind }); scheduleSoon(); toast(h.remind ? L('أُلغي التذكير', 'Reminder off') : L('سيُذكّرك قبلها بيوم', 'You’ll be reminded a day before')) }} aria-label={L('تذكير', 'Reminder')} aria-pressed={!!h.remind} title={L('تذكير قبل يوم', 'Remind a day before')}>{h.remind ? <Bell size={15} color="var(--accent)" /> : <BellOff size={15} />}</button>
           <button className="btn ghost icon sm" onClick={() => setEdit(h)} aria-label={L('تعديل', 'Edit')}><Pencil size={15} /></button>
