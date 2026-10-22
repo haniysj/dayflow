@@ -6,6 +6,8 @@ import { typeColor } from '../components/EventEditor'
 import { TimeGrid } from '../components/TimeGrid'
 import { catName, DateBadge, Empty, FileIcon, PrintIcon, Seg } from '../components/ui'
 import { PlannerDialog } from '../components/WeeklyPlanner'
+import { ItemPreview, type PreviewTarget } from '../components/ItemPreview'
+import type { Task } from '../lib/types'
 import { addDays, addMonths, dow, endOfMonth, fmtLong, fmtMonth, fmtShort, fmtTime, hijri, range, relDay, startOfMonth, startOfWeek, todayStr, weekdayName, minToHM } from '../lib/dates'
 import { useCategories, useEvents, useHolidays, useLeaves, useTasks } from '../lib/db'
 import { EVENT_TYPE_LABEL, L } from '../lib/i18n'
@@ -14,7 +16,11 @@ import { exportICS } from '../lib/io'
 type CalView = 'day' | 'workweek' | 'week' | 'month' | 'agenda'
 
 export function CalendarPage() {
-  const { settings, editTask, editEvent, quickAdd, go, params } = useApp()
+  const { settings, quickAdd, go, params } = useApp()
+  const [preview, setPreview] = useState<PreviewTarget | null>(null)
+  const openTask = (t: Task) => setPreview({ kind: 'task', task: t })
+  const openEvent = (e: any) => setPreview({ kind: 'event', event: e, date: e.instanceDate || e.date })
+  const openItem = (i: { kind: string; ref: any }) => (i.kind === 'task' ? openTask(i.ref) : openEvent(i.ref))
   const [view, setView] = useState<CalView>(() => (params.cv as CalView) || (localStorage.getItem('df-calview') as CalView) || (window.innerWidth < 700 ? 'agenda' : 'week'))
   const [cursor, setCursor] = useState(params.d || todayStr())
   const [showFilter, setShowFilter] = useState(false)
@@ -39,7 +45,7 @@ export function CalendarPage() {
 
   const data = useMemo(() => buildCalendar({
     from, to, events, tasks, leaves, holidays, settings, cats, filter,
-    onEvent: e => editEvent(e, e.instanceDate), onTask: editTask, onLeave: () => go('leave'), onHoliday: () => go('leave'),
+    onEvent: openEvent, onTask: openTask, onLeave: () => go('leave'), onHoliday: () => go('leave'),
   }), [from, to, events, tasks, leaves, holidays, settings, cats, filter])
 
   // swipe: in RTL "next" sits to the left, so the finger moves right (and the reverse in LTR)
@@ -129,7 +135,7 @@ export function CalendarPage() {
           {view === 'day' && <div className="row" style={{ padding: '10px 14px', borderBottom: '1px solid var(--line)' }}><DateBadge date={cursor} sm /><b>{relDay(cursor)}</b>{!settings.workdays.includes(dow(cursor)) && <span className="pill">{L('عطلة نهاية الأسبوع', 'Weekend')}</span>}</div>}
           <TimeGrid dates={dates} items={data.timed} allDay={data.allDay} startHour={settings.dayStart} endHour={settings.dayEnd} slotMin={settings.slotMin} workdays={settings.workdays}
             onSlot={(d, time) => quickAdd({ kind: 'event', date: d, time })}
-            onOpen={it => (it.kind === 'task' ? editTask(it.ref) : editEvent(it.ref, it.ref.instanceDate))}
+            onOpen={openItem}
             onMove={(it, d, s, e) => moveGridItem(it, d, s, e)}
             onDropTask={(id, d, time) => scheduleTaskAt(id, d, time, settings.slotMin)}
             onHeadClick={d => { setCursor(d); setV('day') }} />
@@ -141,7 +147,7 @@ export function CalendarPage() {
           <div className="month" role="grid" aria-label={fmtMonth(cursor)}>
             {dates.slice(0, 7).map(d => <div key={d} className="mh" role="columnheader">{weekdayName(d, window.innerWidth < 700 ? 'narrow' : 'short')}</div>)}
             {dates.map(d => {
-              const items = [...(data.allDay[d] || []), ...data.timed.filter(i => i.date === d).sort((a, b) => a.start - b.start).map(i => ({ key: i.key, title: `${fmtTime(minToHM(i.start)).replace(':00', '')} ${i.title}`, color: i.color, done: i.done, onClick: () => (i.kind === 'task' ? editTask(i.ref) : editEvent(i.ref, i.ref.instanceDate)), est: false }))]
+              const items = [...(data.allDay[d] || []), ...data.timed.filter(i => i.date === d).sort((a, b) => a.start - b.start).map(i => ({ key: i.key, title: `${fmtTime(minToHM(i.start)).replace(':00', '')} ${i.title}`, color: i.color, done: i.done, onClick: () => openItem(i), est: false }))]
               const max = window.innerWidth < 700 ? 2 : 3
               return (
                 <div key={d} role="gridcell" className={`mcell${d.slice(0, 7) !== cursor.slice(0, 7) ? ' out' : ''}${!settings.workdays.includes(dow(d)) ? ' weekend' : ''}${d === today ? ' today' : ''}`}
@@ -156,16 +162,17 @@ export function CalendarPage() {
         </div>
       )}
 
-      {view === 'agenda' && <Agenda dates={dates} data={data} />}
+      {view === 'agenda' && <Agenda dates={dates} data={data} onOpen={openItem} />}
       </div>
+      {preview && <ItemPreview target={preview} onClose={() => setPreview(null)} />}
       {planner && <PlannerDialog initialMonth={cursor} onClose={() => setPlanner(false)} />}
       <p className="tiny muted" style={{ margin: 0 }}>{L('الأسبوع يبدأ يوم الأحد، والجمعة والسبت عطلة نهاية الأسبوع (قابل للتعديل من الإعدادات). العطل ذات الإطار المنقّط تواريخ تقديرية.', 'Weeks start on Sunday; Friday and Saturday are the weekend (configurable in Settings). Dashed holidays are estimated dates.')}<span className="swipe-hint"> {L('اسحب بإصبعك يميناً أو يساراً للتنقل.', 'Swipe left or right to move between periods.')}</span></p>
     </div>
   )
 }
 
-function Agenda({ dates, data }: { dates: string[]; data: ReturnType<typeof buildCalendar> }) {
-  const { editTask, editEvent, quickAdd } = useApp()
+function Agenda({ dates, data, onOpen }: { dates: string[]; data: ReturnType<typeof buildCalendar>; onOpen: (i: { kind: string; ref: any }) => void }) {
+  const { quickAdd } = useApp()
   const today = todayStr()
   const days = dates.map(d => ({ d, all: data.allDay[d] || [], timed: data.timed.filter(i => i.date === d).sort((a, b) => a.start - b.start) })).filter(x => x.all.length || x.timed.length)
   if (!days.length) return <div className="card"><Empty text={L('لا شيء في هذه الفترة.', 'Nothing in this period.')} action={<button className="btn sm" onClick={() => quickAdd({ kind: 'event' })}><Plus size={15} />{L('إضافة موعد', 'Add event')}</button>} /></div>
@@ -179,9 +186,9 @@ function Agenda({ dates, data }: { dates: string[]; data: ReturnType<typeof buil
               <b className="small">{relDay(d)}</b>
               {all.map(a => <button key={a.key} className={`chip${a.est ? ' est' : ''}${a.done ? ' done' : ''}`} style={{ ['--c' as any]: a.color, fontSize: 13.5, padding: '3px 9px' }} onClick={a.onClick}>{a.title}</button>)}
               {timed.map(i => (
-                <button key={i.key} className="row" style={{ border: 0, background: 'none', textAlign: 'start', padding: '4px 0', cursor: 'pointer', alignItems: 'flex-start' }} onClick={() => (i.kind === 'task' ? editTask(i.ref) : editEvent(i.ref, i.ref.instanceDate))}>
+                <button key={i.key} className="row" style={{ border: 0, background: 'none', textAlign: 'start', padding: '4px 0', cursor: 'pointer', alignItems: 'flex-start' }} onClick={() => onOpen(i)}>
                   <span className="dot" style={{ ['--c' as any]: i.color, marginTop: 7 }} />
-                  <span className="ltr nowrap small muted" style={{ minWidth: 76 }}>{fmtTime(minToHM(i.start))}</span>
+                  <span className="iso nowrap small muted" style={{ minWidth: 76 }}>{fmtTime(minToHM(i.start))}</span>
                   <span className="grow">
                     <span style={{ fontWeight: 650, textDecoration: i.done ? 'line-through' : undefined }}>{i.title}</span>
                     {i.sub && <span className="tiny muted row"><MapPin size={11} />{i.sub}</span>}

@@ -90,7 +90,7 @@ export function TaskRow({ t, cats, projects, showDate = true, selectable, select
           {showDate && t.dueDate && <span className={`pill${overdue ? ' overdue' : ''}`}><CalendarClock size={12} />{relDay(t.dueDate, today)}</span>}
           {overdue && <span className="pill overdue">{L('متأخرة', 'Overdue')}</span>}
           {!t.dueDate && <span className="pill outline">{L('بدون تاريخ', 'No date')}</span>}
-          {t.startTime && <span className="pill"><Clock size={12} /><span className="ltr">{fmtTime(t.startTime)}</span></span>}
+          {t.startTime && <span className="pill"><Clock size={12} /><span className="iso">{fmtTime(t.startTime)}</span></span>}
           {t.estMin ? <span className="pill">{fmtDuration(t.estMin)}</span> : null}
           {t.status === 'waiting' && <span className="pill saffron"><Hourglass size={12} />{L('بانتظار رد', 'Waiting')}{t.contact ? ` · ${t.contact}` : ''}</span>}
           {t.status === 'in_progress' && <span className="pill teal">{L('قيد التنفيذ', 'In progress')}</span>}

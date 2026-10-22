@@ -51,7 +51,7 @@ export function ReminderCenter({ onClose }: { onClose: () => void }) {
         <div className="section-title">{L('القادمة', 'Upcoming')}</div>
         {next.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{L('لا تذكيرات مجدولة.', 'No scheduled reminders.')}</p> : next.map(i => (
           <div key={i.id} className="row small" style={{ padding: '4px 0' }}>
-            <span className="ltr nowrap muted" style={{ minWidth: 110 }}>{when(i.at)}</span>
+            <span className="iso nowrap muted" style={{ minWidth: 110 }}>{when(i.at)}</span>
             <span className="grow ellipsis">{i.title}</span>
           </div>
         ))}

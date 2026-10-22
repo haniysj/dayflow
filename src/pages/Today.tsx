@@ -90,7 +90,7 @@ export function Today() {
                 <div className="tiny muted" style={{ fontWeight: 700 }}>{L('التالي في جدولك', 'Next on your schedule')}</div>
                 {next ? <div className="row wrap" style={{ gap: 8 }}>
                   <b style={{ fontSize: 16 }}>{next.title}</b>
-                  <span className="pill" style={{ background: 'rgba(255,255,255,.14)', color: 'inherit' }}><span className="ltr">{fmtTime(minToHM(next.start))} – {fmtTime(minToHM(next.end))}</span></span>
+                  <span className="pill" style={{ background: 'rgba(255,255,255,.14)', color: 'inherit' }}><span className="iso">{fmtTime(minToHM(next.start))} – {fmtTime(minToHM(next.end))}</span></span>
                   {next.start > nowM && <span className="tiny muted">{L('بعد', 'in')} {fmtDuration(next.start - nowM)}</span>}
                   {next.start <= nowM && <span className="tiny muted">{L('جارٍ الآن', 'happening now')}</span>}
                 </div> : <b>{L('لا مواعيد متبقية اليوم — وقت مرن', 'Nothing else scheduled — flexible time')}</b>}
@@ -179,7 +179,7 @@ export function Today() {
             {tomorrowEvents.length + tomorrowTasks.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{L('لا شيء مجدول للغد بعد.', 'Nothing scheduled for tomorrow yet.')}</p> : (
               <div className="col" style={{ gap: 4 }}>
                 {tomorrowEvents.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || '')).map(e => (
-                  <div key={e.id + e.instanceDate} className="row small"><span className="dot" style={{ ['--c' as any]: 'var(--accent)' }} /><span className="ltr nowrap muted">{e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}</span><span className="ellipsis">{e.title}</span></div>
+                  <div key={e.id + e.instanceDate} className="row small"><span className="dot" style={{ ['--c' as any]: 'var(--accent)' }} /><span className="iso nowrap muted">{e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}</span><span className="ellipsis">{e.title}</span></div>
                 ))}
                 {tomorrowTasks.map(t => <div key={t.id} className="row small"><span className="dot" style={{ ['--c' as any]: 'var(--saffron)' }} /><span className="ellipsis">{t.title}</span></div>)}
               </div>

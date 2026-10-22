@@ -12,7 +12,7 @@ import { FileIcon, Modal, PrintIcon, Seg, Switch, toast } from './ui'
 
 /* Physical layout on paper (independent of RTL/LTR):
    header  = [month calendar | week priorities | title]  → calendar sits top-LEFT
-   each day = [day+date | writing space]  (day on the left by default, can be switched)  */
+   each day = [day+date | writing space]  (day on the right by default, can be switched)  */
 
 const PAGE_W = 210, PAGE_H = 297 // mm, A4 portrait
 const MM = 96 / 25.4 // px per mm
@@ -34,7 +34,7 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
   const today = todayStr()
   const [opts, setOpts] = useState<Opts>(() => {
     const m = startOfMonth(initialMonth || today)
-    return { month: m, startWeek: weeksOfMonth(m)[0], weeks: 4, labelSide: 'left', withItems: true, withHijri: true }
+    return { month: m, startWeek: weeksOfMonth(m)[0], weeks: 4, labelSide: 'right', withItems: true, withHijri: true }
   })
   const up = (c: Partial<Opts>) => setOpts(o => ({ ...o, ...c }))
   const monthOptions = useMemo(() => Array.from({ length: 15 }, (_, i) => addMonths(startOfMonth(today), i - 2)), [today])
@@ -142,7 +142,7 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
             <Seg label={L('عدد الأسابيع', 'Weeks')} value={opts.weeks} onChange={v => up({ weeks: v })} options={[1, 2, 3, 4, 5].map(v => ({ v, l: String(v) }))} />
           </div>
           <div className="field"><span>{L('موضع اليوم والتاريخ', 'Day & date position')}</span>
-            <Seg label={L('موضع اليوم', 'Day position')} value={opts.labelSide} onChange={v => up({ labelSide: v })} options={[{ v: 'left', l: L('يسار', 'Left') }, { v: 'right', l: L('يمين', 'Right') }]} />
+            <Seg label={L('موضع اليوم', 'Day position')} value={opts.labelSide} onChange={v => up({ labelSide: v })} options={[{ v: 'right', l: L('يمين', 'Right') }, { v: 'left', l: L('يسار', 'Left') }]} />
           </div>
         </div>
         <div className="row wrap" style={{ gap: 18 }}>

@@ -51,7 +51,7 @@ export function LeavePage() {
               <div className="grow">
                 <b>{(LEAVE_TYPE_LABEL() as any)[l.type]}</b>
                 <div className="row wrap" style={{ gap: 5 }}>
-                  <span className="small ltr nowrap">{fmtShort(l.start)} – {fmtShort(l.end)}</span>
+                  <span className="small iso nowrap">{fmtShort(l.start)} – {fmtShort(l.end)}</span>
                   <span className="pill">{l.workingDays} {L('أيام عمل', 'working days')}</span>
                   <span className={`pill${l.start <= today && l.end >= today ? ' teal' : ''}`}>{status}</span>
                   {l.demo && <span className="pill outline">{L('تجريبي', 'Demo')}</span>}
@@ -173,7 +173,7 @@ function HolidaysSection({ holidays }: { holidays: Holiday[] }) {
           <div className="grow">
             <b>{h.name}</b>{h.nameEn && <span className="tiny muted hide-m"> · {h.nameEn}</span>}
             <div className="row wrap" style={{ gap: 5 }}>
-              <span className="small ltr nowrap">{h.start === h.end ? fmtMed(h.start) : `${fmtShort(h.start)} – ${fmtShort(h.end)}`}</span>
+              <span className="small iso nowrap">{h.start === h.end ? fmtMed(h.start) : `${fmtShort(h.start)} – ${fmtShort(h.end)}`}</span>
               {h.start === h.end ? null : <span className="pill">{diffDays(h.end, h.start) + 1} {L('أيام', 'days')}</span>}
               {h.status === 'confirmed' ? <span className="pill teal"><CheckCircle2 size={11} />{L('مؤكد', 'Confirmed')}</span> : <span className="pill saffron" style={{ border: '1px dashed' }}>{L('تقديري — غير مؤكد', 'Estimated — unconfirmed')}</span>}
               {!h.official && <span className="pill outline">{L('مناسبة شخصية', 'Personal')}</span>}

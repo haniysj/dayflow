@@ -70,7 +70,7 @@ export function PlanTomorrow({ onClose }: { onClose: () => void }) {
       <div>
         <div className="section-title">2. {L('مواعيد', 'Appointments on')} {relDay(target)}</div>
         {appts.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{L('لا مواعيد.', 'No appointments.')}</p> : appts.map(e => (
-          <div key={e.id + e.instanceDate} className="row small" style={{ padding: '3px 0' }}><CalendarClock size={14} className="muted" /><span className="ltr nowrap muted" style={{ minWidth: 70 }}>{e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}</span><span>{e.title}</span></div>
+          <div key={e.id + e.instanceDate} className="row small" style={{ padding: '3px 0' }}><CalendarClock size={14} className="muted" /><span className="iso nowrap muted" style={{ minWidth: 70 }}>{e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}</span><span>{e.title}</span></div>
         ))}
       </div>
 
