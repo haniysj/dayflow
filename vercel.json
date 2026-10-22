@@ -45,7 +45,7 @@
     "api/pdf.ts": {
       "maxDuration": 60,
       "memory": 2048,
-      "includeFiles": "node_modules/{@sparticuz/chromium/bin/**,@fontsource-variable/cairo/files/cairo-arabic-wght-normal.woff2,@fontsource-variable/cairo/files/cairo-latin-wght-normal.woff2}"
+      "includeFiles": "node_modules/{@sparticuz/chromium/bin/**,@fontsource/cairo/files/cairo-{arabic,latin}-{400,700,800}-normal.woff2}"
     }
   }
 }
