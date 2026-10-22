@@ -4,7 +4,8 @@ import { useApp } from '../app-context'
 import { ALL_TYPES, buildCalendar, moveGridItem, scheduleTaskAt, type CalFilter } from '../components/calendarData'
 import { typeColor } from '../components/EventEditor'
 import { TimeGrid } from '../components/TimeGrid'
-import { catName, DateBadge, Empty, FileIcon, Seg } from '../components/ui'
+import { catName, DateBadge, Empty, FileIcon, PrintIcon, Seg } from '../components/ui'
+import { PlannerDialog } from '../components/WeeklyPlanner'
 import { addDays, addMonths, dow, endOfMonth, fmtLong, fmtMonth, fmtShort, fmtTime, hijri, range, relDay, startOfMonth, startOfWeek, todayStr, weekdayName, minToHM } from '../lib/dates'
 import { useCategories, useEvents, useHolidays, useLeaves, useTasks } from '../lib/db'
 import { EVENT_TYPE_LABEL, L } from '../lib/i18n'
@@ -17,6 +18,7 @@ export function CalendarPage() {
   const [view, setView] = useState<CalView>(() => (params.cv as CalView) || (localStorage.getItem('df-calview') as CalView) || (window.innerWidth < 700 ? 'agenda' : 'week'))
   const [cursor, setCursor] = useState(params.d || todayStr())
   const [showFilter, setShowFilter] = useState(false)
+  const [planner, setPlanner] = useState(params.planner === '1')
   const [filter, setFilter] = useState<CalFilter>({ types: Object.fromEntries(ALL_TYPES.map(t => [t, true])), q: '' })
   const events = useEvents() || []
   const tasks = useTasks() || []
@@ -95,6 +97,7 @@ export function CalendarPage() {
             { v: 'month', l: L('شهر', 'Month') }, { v: 'agenda', l: L('قائمة', 'Agenda') },
           ]} />
           <button className={`btn sm${activeFilters ? ' accent' : ''}`} onClick={() => setShowFilter(s => !s)} aria-expanded={showFilter}><Filter size={15} />{L('تصفية', 'Filter')}{activeFilters ? ` (${activeFilters})` : ''}</button>
+          <button className="btn sm" onClick={() => setPlanner(true)} title={L('طباعة مخطط أسبوعي A4 أو حفظه PDF', 'Print an A4 weekly planner or save as PDF')}><PrintIcon size={16} />{L('مخطط للطباعة', 'Printable planner')}</button>
           <button className="btn sm" onClick={exportICS} title={L('تصدير التقويم بصيغة ICS', 'Export calendar as ICS')}><FileIcon kind="ics" size={17} />ICS</button>
           <button className="btn primary sm" onClick={() => quickAdd({ kind: 'event', date: view === 'month' || view === 'agenda' ? (cursor >= today ? cursor : today) : cursor })}><Plus size={15} />{L('موعد', 'Event')}</button>
         </div>
@@ -155,6 +158,7 @@ export function CalendarPage() {
 
       {view === 'agenda' && <Agenda dates={dates} data={data} />}
       </div>
+      {planner && <PlannerDialog initialMonth={cursor} onClose={() => setPlanner(false)} />}
       <p className="tiny muted" style={{ margin: 0 }}>{L('الأسبوع يبدأ يوم الأحد، والجمعة والسبت عطلة نهاية الأسبوع (قابل للتعديل من الإعدادات). العطل ذات الإطار المنقّط تواريخ تقديرية.', 'Weeks start on Sunday; Friday and Saturday are the weekend (configurable in Settings). Dashed holidays are estimated dates.')}<span className="swipe-hint"> {L('اسحب بإصبعك يميناً أو يساراً للتنقل.', 'Swipe left or right to move between periods.')}</span></p>
     </div>
   )

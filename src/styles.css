@@ -348,3 +348,57 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 [dir="rtl"] .slide-prev { animation-name: slideFromEnd; }
 .swipe-hint { display: none; }
 @media (hover: none) and (pointer: coarse) { .swipe-hint { display: inline; } }
+
+/* ===================== Weekly planner sheet (A4) ===================== */
+#pl-print-root { position: fixed; left: -10000px; top: 0; z-index: -1; pointer-events: none; }
+.pl-page {
+  width: 210mm; height: 297mm; padding: 9mm 9mm 7mm; box-sizing: border-box; background: #fff; color: #102A43;
+  font-family: 'Cairo Variable', 'Cairo', Tahoma, sans-serif; display: flex; flex-direction: column; gap: 4mm; overflow: hidden;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.pl-head { display: flex; align-items: stretch; gap: 5mm; height: 44mm; flex-shrink: 0; }
+.pl-cal { width: 56mm; flex-shrink: 0; border: 0.35mm solid #D9E2EC; border-radius: 3mm; padding: 2mm 2.5mm; }
+.pl-cal-t { font-weight: 800; font-size: 9.5pt; text-align: center; margin-bottom: 1mm; }
+.pl-cal-g { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 0.4mm; text-align: center; font-size: 7.5pt; line-height: 4.4mm; }
+.pl-cal-h { font-weight: 800; color: #627D98; }
+.pl-cal-d { border-radius: 1mm; }
+.pl-cal-d.out { color: #BCCCDC; }
+.pl-cal-d.we { color: #9FB3C8; }
+.pl-cal-d.hol { color: #2E7D32; font-weight: 800; }
+.pl-cal-d.wk { background: #102A43; color: #fff; font-weight: 800; }
+.pl-prio { flex: 1; min-width: 0; border: 0.35mm solid #D9E2EC; border-radius: 3mm; padding: 2mm 3mm; display: flex; flex-direction: column; }
+.pl-label { font-weight: 800; font-size: 9pt; color: #1F7A6D; margin-bottom: 0.5mm; }
+.pl-prio-line { flex: 1; border-bottom: 0.25mm solid #D9E2EC; display: flex; align-items: flex-end; padding-bottom: 0.6mm; }
+.pl-prio-line span { width: 5mm; height: 5mm; border-radius: 1.2mm; background: #FBEBD0; color: #8A6100; font-size: 7.5pt; font-weight: 800; display: grid; place-items: center; }
+.pl-title { width: 60mm; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; }
+.pl-app { font-size: 8pt; font-weight: 700; color: #627D98; }
+.pl-title h1 { font-size: 19pt; line-height: 1.15; margin: 0.5mm 0 1mm; font-weight: 800; }
+.pl-range { font-size: 11pt; font-weight: 800; }
+.pl-week { font-size: 8.5pt; color: #627D98; font-weight: 700; margin-top: 0.5mm; }
+.pl-table { flex: 1; display: flex; flex-direction: column; border: 0.4mm solid #102A43; border-radius: 3mm; overflow: hidden; min-height: 0; }
+.pl-row { flex: 1; display: flex; min-height: 0; border-bottom: 0.3mm solid #9FB3C8; }
+.pl-row:last-child { border-bottom: 0; }
+.pl-day { width: 27mm; flex-shrink: 0; background: #EEF2F6; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.5mm 1mm; }
+.pl-row > .pl-day:first-child { border-right: 0.3mm solid #9FB3C8; }
+.pl-row > .pl-day:last-child { border-left: 0.3mm solid #9FB3C8; }
+.pl-dname { font-size: 10.5pt; font-weight: 800; line-height: 1.2; }
+.pl-dnum { font-size: 22pt; font-weight: 800; line-height: 1.05; }
+.pl-dmon { font-size: 8.5pt; font-weight: 700; color: #334E68; }
+.pl-hijri { font-size: 6.5pt; color: #627D98; margin-top: 0.8mm; line-height: 1.3; }
+.pl-write { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 0.5mm 3mm 0; }
+.pl-write.off { background: #F3FAF5; }
+.pl-line { flex: 1; border-bottom: 0.2mm dashed #D9E2EC; display: flex; align-items: flex-end; gap: 1.5mm; padding-bottom: 0.4mm; font-size: 8.5pt; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.pl-line:last-child { border-bottom: 0; }
+.pl-time { font-weight: 800; color: #1F7A6D; margin: 0 1.5mm; unicode-bidi: isolate; white-space: nowrap; }
+.pl-tag { border: 0.25mm solid; border-radius: 5mm; padding: 0 2mm; font-size: 7.5pt; font-weight: 800; }
+.pl-done { text-decoration: line-through; color: #829AB1; }
+.pl-more { color: #627D98; font-size: 7.5pt; font-weight: 700; }
+.pl-foot { display: flex; justify-content: space-between; font-size: 7pt; color: #829AB1; flex-shrink: 0; }
+
+@media print {
+  body.pl-printing > *:not(#pl-print-root) { display: none !important; }
+  body.pl-printing { background: #fff !important; }
+  body.pl-printing #pl-print-root { position: static; left: auto; z-index: auto; }
+  body.pl-printing .pl-page { break-after: page; page-break-after: always; }
+  body.pl-printing .pl-page:last-child { break-after: auto; page-break-after: auto; }
+}
