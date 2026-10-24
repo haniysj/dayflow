@@ -1,4 +1,5 @@
-import { addDays, todayStr } from './dates'
+import { addDays, todayStr, zonedToMs } from './dates'
+import { remFireAt } from './reminders'
 import { alive, db, getSettings, save, TABLES } from './db'
 import { EVENT_TYPE_LABEL, PRIORITY_LABEL, STATUS_LABEL } from './i18n'
 import { CURRENT_SCHEMA } from './migrate'
@@ -86,7 +87,13 @@ export async function exportICS() {
       lines.push(rr)
       for (const x of e.exDates || []) lines.push(e.allDay ? `EXDATE;VALUE=DATE:${icsDate(x)}` : `EXDATE;TZID=${tz}:${icsDT(x, e.startTime || '09:00')}`)
     }
-    for (const m of e.reminders || []) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', fold(`DESCRIPTION:${icsEsc(e.title)}`), `TRIGGER:-PT${m}M`, 'END:VALARM')
+    const startMs = zonedToMs(e.date, e.allDay ? '00:00' : e.startTime || '09:00')
+    for (const r of e.reminders || []) {
+      const fire = remFireAt(r, e.date, e.startTime, e.allDay, s.defaultReminderTime)
+      if (fire == null) continue
+      const delta = Math.round((startMs - fire) / 60000)
+      lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', fold(`DESCRIPTION:${icsEsc(e.title)}`), delta >= 0 ? `TRIGGER:-PT${delta}M` : `TRIGGER:PT${-delta}M`, 'END:VALARM')
+    }
     lines.push('END:VEVENT')
   }
   const tasks = alive(await db.tasks.toArray()).filter(t => t.dueDate && !['cancelled', 'archived'].includes(t.status))

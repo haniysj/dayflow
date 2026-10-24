@@ -18,6 +18,7 @@ import {
   backendConfigured, changePassword, errCode, getSyncInfo, getToken, logout, onSync, onSyncEnabled, queueTestPush, setSyncEnabled, syncEnabled, syncNow, wipeRemote,
 } from '../lib/sync'
 import { SyncConnectForm } from '../components/SyncConnect'
+import { ReminderPicker } from '../components/ReminderPicker'
 import type { Settings } from '../lib/types'
 
 type Tab = 'general' | 'appearance' | 'notify' | 'sync' | 'calendar' | 'data'
@@ -189,9 +190,14 @@ function Notify({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void }
       </Card>
       <Card title={L('تفضيلات التذكير', 'Reminder preferences')} icon={<Bell size={18} />}>
         <Row title={L('تفعيل التذكيرات', 'Enable reminders')}><Switch label="notify" checked={s.notifyEnabled} onChange={v => { set({ notifyEnabled: v }); setTimeout(refreshSchedule, 300) }} /></Row>
-        <Row title={L('التذكير الافتراضي للعناصر الجديدة', 'Default reminder for new items')}>
+        <Row title={L('التذكير الافتراضي للمهام الجديدة', 'Default reminder for new tasks')}>
           {REMINDER_OPTIONS().map(o => { const on = s.defaultReminders.includes(o.v); return <button key={o.v} className={`fchip${on ? ' on' : ''}`} aria-pressed={on} onClick={() => set({ defaultReminders: on ? s.defaultReminders.filter(x => x !== o.v) : [...s.defaultReminders, o.v] })}>{o.l}</button> })}
         </Row>
+        <div className="set-row" style={{ display: 'block' }}>
+          <b style={{ display: 'block' }}>{L('التذكير الافتراضي للمواعيد الجديدة', 'Default reminders for new events')}</b>
+          <span className="small muted" style={{ display: 'block', marginBottom: 8 }}>{L('يُطبَّق على كل موعد جديد، ويمكن تغييره لكل موعد على حدة.', 'Applied to every new event; can be changed per event.')}</span>
+          <ReminderPicker timed value={s.defaultEventReminders} onChange={v => set({ defaultEventReminders: v })} repeat={s.defaultEventRepeat} onRepeat={r => set({ defaultEventRepeat: r })} />
+        </div>
         <Row title={L('وقت تذكير المهام بلا وقت', 'Reminder time for untimed tasks')}><input className="input" type="time" style={{ width: 130 }} value={s.defaultReminderTime} onChange={e => set({ defaultReminderTime: e.target.value })} /></Row>
         <Row title={L('ساعات الهدوء', 'Quiet hours')} hint={L('تُؤجَّل التنبيهات خلالها إلى نهايتها', 'Reminders during this window are delivered when it ends')}>
           <Switch label="quiet" checked={s.quietEnabled} onChange={v => set({ quietEnabled: v })} />

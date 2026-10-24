@@ -1,6 +1,7 @@
 import { addDays, addMonths, diffDays, dow, range, todayStr } from './dates'
 import { db, patch, save, uid } from './db'
-import type { CalEvent, Holiday, Recurrence, Settings, Task } from './types'
+import { PRIORITY_SLOTS } from './types'
+import type { CalEvent, Holiday, PrioritySlot, Recurrence, Settings, Task } from './types'
 
 // ---------- recurrence ----------
 export function occursOn(start: string, rule: Recurrence, day: string, workdays?: number[]): boolean {
@@ -183,18 +184,22 @@ export function layoutOverlaps<T>(items: { item: T; start: number; end: number }
   return out
 }
 
+export const emptySlots = () => Array.from({ length: PRIORITY_SLOTS }, () => null) as (PrioritySlot | null)[]
+/** Pad/trim a stored slot list to PRIORITY_SLOTS */
+export const normSlots = (p?: (PrioritySlot | null)[] | null) => { const a = [...(p || [])].slice(0, PRIORITY_SLOTS); while (a.length < PRIORITY_SLOTS) a.push(null); return a }
+
 export async function setPriority(date: string, slot: number, value: any) {
-  const d = (await db.days.get(date)) || { id: date, updatedAt: 0, priorities: [null, null, null] }
-  const pr = [...(d.priorities || [null, null, null])]
-  while (pr.length < 3) pr.push(null)
+  const d = (await db.days.get(date)) || { id: date, updatedAt: 0, priorities: emptySlots() }
+  const pr = [...(d.deleted ? emptySlots() : d.priorities || emptySlots())]
+  while (pr.length < PRIORITY_SLOTS) pr.push(null)
   pr[slot] = value
-  await save('days', { ...d, deleted: 0, priorities: pr.slice(0, 3) })
+  await save('days', { ...d, deleted: 0, priorities: pr.slice(0, PRIORITY_SLOTS) })
 }
 
 export async function ensureDay(date: string) {
   const d = await db.days.get(date)
-  if (d && !d.deleted) return d
-  return { id: date, updatedAt: 0, priorities: [null, null, null] } as any
+  if (d && !d.deleted) return { ...d, priorities: normSlots(d.priorities) }
+  return { id: date, updatedAt: 0, priorities: emptySlots() } as any
 }
 
 export { patch }

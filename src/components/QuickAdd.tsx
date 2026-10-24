@@ -24,7 +24,7 @@ export function QuickAdd({ defaults, onClose }: { defaults: QuickAddDefaults; on
 
   const endFor = (t: string) => defaults.endTime || minToHM(hmToMin(t) + 60)
   const build = () => {
-    if (kind === 'event') return newEvent({ id: ids.event, title: title.trim(), date: date || today, allDay: !time, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, reminders: settings.defaultReminders })
+    if (kind === 'event') return newEvent({ id: ids.event, title: title.trim(), date: date || today, allDay: !time, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, reminders: settings.defaultEventReminders, reminderRepeat: settings.defaultEventRepeat })
     return newTask({ id: ids.task, title: title.trim(), dueDate: date, startTime: time || null, endTime: time ? endFor(time) : null, categoryId: cat || null, projectId: defaults.projectId || null, reminders: date ? settings.defaultReminders : [] })
   }
   async function submit() {

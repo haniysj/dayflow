@@ -64,7 +64,7 @@ export function TaskRow({ t, cats, projects, showDate = true, selectable, select
     const d = await ensureDay(today)
     const idx = d.priorities.findIndex((p: any) => !p)
     if (d.priorities.some((p: any) => p?.taskId === t.id)) return toast(L('هي ضمن أولويات اليوم بالفعل', 'Already a top priority today'))
-    if (idx < 0) return toast(L('الأولويات الثلاث ممتلئة — أزل واحدة أولاً', 'All three priorities are set — remove one first'), { err: true })
+    if (idx < 0) return toast(L('الأولويات الخمس ممتلئة — أزل واحدة أولاً', 'All five priorities are set — remove one first'), { err: true })
     await setPriority(today, idx, { title: t.title, taskId: t.id, priority: t.priority, estMin: t.estMin, done: done })
     if (t.dueDate !== today) await rescheduleTask(t, today)
     toast(L(`أصبحت الأولوية رقم ${idx + 1} لليوم`, `Set as today's priority #${idx + 1}`))

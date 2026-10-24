@@ -103,6 +103,9 @@ export const DEFAULT_SETTINGS: Settings = {
   typeColors: {},
   notifyEnabled: true,
   defaultReminders: [10],
+  // events: the evening before + the morning of the day (plus whatever the user adds)
+  defaultEventReminders: [{ d: 1, t: '20:00' }, { d: 0, t: '07:00' }],
+  defaultEventRepeat: null,
   defaultReminderTime: '08:00',
   quietEnabled: true,
   quietStart: '22:30',

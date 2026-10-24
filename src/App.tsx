@@ -11,7 +11,7 @@ import { BrandMark, ConfirmHost, Modal, Toasts, toast } from './components/ui'
 import { setFormat, setTimeZone, todayStr, fmtMed } from './lib/dates'
 import { db, getLastSaved, onLocalChange, updateSettings, useSettings } from './lib/db'
 import { L, setLang } from './lib/i18n'
-import { centerItems, onCenter, setOnFire } from './lib/notify'
+import { ackReminder, centerItems, onCenter, setOnFire } from './lib/notify'
 import { onSync, getToken, syncNow, needsConnect, setSyncEnabled, onSyncEnabled } from './lib/sync'
 import { SyncConnectPrompt } from './components/SyncConnect'
 import type { CalEvent, Task } from './lib/types'
@@ -94,6 +94,7 @@ export default function App() {
 
   // deep links (notifications, shortcuts)
   const openFromParams = useCallback(async (p: Record<string, string>) => {
+    if (p.r) ackReminder(p.r) // opened from an alert → stop its remaining repeats
     if (p.task) { const t = await db.tasks.get(p.task); if (t && !t.deleted) setModal({ kind: 'task', t }) }
     else if (p.event) { const e = await db.events.get(p.event); if (e && !e.deleted) setModal({ kind: 'event', e, d: p.d }) }
     else if (p.review) setModal({ kind: 'review', date: todayStr() })
@@ -255,7 +256,7 @@ function OnboardingHint({ show }: { show: boolean }) {
         <div className="grow">
           <b>{L('مرحباً بك في DayFlow', 'Welcome to DayFlow')}</b>
           <ul className="small" style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
-            <li>{L('ابدأ بتحديد أهم ثلاث أولويات لليوم.', 'Start by setting today’s top three.')}</li>
+            <li>{L('ابدأ بتحديد أهم 5 أولويات لليوم.', 'Start by setting today’s top five.')}</li>
             <li>{L('زر + يضيف مهمة أو موعداً أو ملاحظة بسرعة.', 'The + button adds a task, event or note fast.')}</li>
             <li>{L('البيانات التجريبية معلّمة «تجريبي» ويمكن حذفها من الإعدادات.', 'Demo records are labelled “Demo” and can be cleared in Settings.')}</li>
             <li>{L('اربط المزامنة والتنبيهات من الإعدادات.', 'Connect sync and notifications in Settings.')}</li>

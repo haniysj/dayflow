@@ -3,7 +3,8 @@ import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { hmToMin, isValidDate, isValidTime, minToHM } from '../lib/dates'
 import { db, remove, save, uid, useCategories } from '../lib/db'
-import { EVENT_TYPE_LABEL, L, REMINDER_OPTIONS } from '../lib/i18n'
+import { EVENT_TYPE_LABEL, L } from '../lib/i18n'
+import { ReminderPicker } from './ReminderPicker'
 import { newEvent } from '../lib/logic'
 import { scheduleSoon } from '../lib/notify'
 import type { CalEvent, EventType } from '../lib/types'
@@ -21,7 +22,7 @@ export function EventEditor({ ev, instanceDate, onClose }: { ev: CalEvent | Part
   const { settings } = useApp()
   const cats = useCategories() || []
   const isNew = !(ev as any).updatedAt
-  const [e, setE] = useState<CalEvent>(() => (isNew ? newEvent({ reminders: settings.defaultReminders, ...ev }) : { ...(ev as CalEvent) }))
+  const [e, setE] = useState<CalEvent>(() => (isNew ? newEvent({ reminders: settings.defaultEventReminders, reminderRepeat: settings.defaultEventRepeat, ...ev }) : { ...(ev as CalEvent) }))
   const recurringInstance = !isNew && !!e.recurrence && !!instanceDate && instanceDate !== e.date
   const [scope, setScope] = useState<'one' | 'all'>(recurringInstance ? 'one' : 'all')
   const [err, setErr] = useState('')
@@ -135,13 +136,7 @@ export function EventEditor({ ev, instanceDate, onClose }: { ev: CalEvent | Part
       </div>
       {scope === 'all' && <div className="field"><span>{L('تكرار', 'Repeat')}</span><RecurrenceField value={e.recurrence || null} start={e.date} onChange={r => up({ recurrence: r })} /></div>}
       <div className="field"><span>{L('التذكير', 'Reminders')}</span>
-        <div className="row wrap">
-          {REMINDER_OPTIONS().map(o => {
-            const on = e.reminders?.includes(o.v)
-            return <button key={o.v} type="button" className={`fchip${on ? ' on' : ''}`} aria-pressed={on}
-              onClick={() => up({ reminders: on ? e.reminders!.filter(x => x !== o.v) : [...(e.reminders || []), o.v] })}>{o.l}</button>
-          })}
-        </div>
+        <ReminderPicker timed={!e.allDay} value={e.reminders || []} onChange={v => up({ reminders: v })} repeat={e.reminderRepeat} onRepeat={r => up({ reminderRepeat: r })} />
       </div>
       <label className="field"><span>{L('ملاحظات', 'Notes')}</span>
         <textarea className="input" value={e.notes || ''} onChange={x => up({ notes: x.target.value })} />

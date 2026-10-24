@@ -64,7 +64,7 @@ export function ReportsPage() {
         <Kpi v={pctTxt(rate(todayS.done, todayS.due))} l={L('إنجاز اليوم', 'Today')} sub={`${todayS.done}/${todayS.due}`} />
         <Kpi v={pctTxt(rate(weekDone, weekDue))} l={L('إنجاز الأسبوع', 'This week')} sub={`${weekDone}/${weekDue}`} />
         <Kpi v={planned ? `${plannedDone}/${planned}` : '—'} l={L('المخطط مقابل المنجز', 'Planned vs done')} sub={planned ? pctTxt(rate(plannedDone, planned)) : L('من «خطّط للغد»', 'from “Plan Tomorrow”')} />
-        <Kpi v={prioSet ? `${prioDone}/${prioSet}` : '—'} l={L('الأولويات الثلاث', 'Top-three done')} sub={L('هذا الأسبوع', 'this week')} />
+        <Kpi v={prioSet ? `${prioDone}/${prioSet}` : '—'} l={L('الأولويات المنجزة', 'Top priorities done')} sub={L('هذا الأسبوع', 'this week')} />
         <Kpi v={String(overdue)} l={L('متأخرة الآن', 'Overdue now')} tone={overdue ? 'var(--overdue)' : undefined} />
         <Kpi v={String(carried)} l={L('مُرحّلة هذا الأسبوع', 'Carried forward')} sub={L('أُجّلت من موعدها', 'moved from due date')} />
         <Kpi v={`${reviewed}/${workdaysSoFar.length}`} l={L('انتظام المراجعة اليومية', 'Daily review consistency')} />

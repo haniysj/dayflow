@@ -6,13 +6,15 @@ import { useMemo, useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { buildCalendar, moveGridItem, scheduleTaskAt } from '../components/calendarData'
 import { Menu, MenuItem, quickComplete, TaskRow } from '../components/TaskRow'
+import { ItemPreview, type PreviewTarget } from '../components/ItemPreview'
+import { typeColor } from '../components/EventEditor'
 import { CheckIcon } from '../components/TaskEditor'
 import { TimeGrid } from '../components/TimeGrid'
 import { catName, confirmDialog, DateBadge, Empty, Modal, toast } from '../components/ui'
 import { addDays, dow, fmtDuration, fmtLong, fmtNumeric, fmtTime, hijri, hmToMin, msToDate, nowMinutes, relDay, todayStr, minToHM } from '../lib/dates'
 import { patch, remove, save, uid, useCategories, useDay, useEvents, useHolidays, useLeaves, useNotes, useProjects, useTasks } from '../lib/db'
 import { L, PRIORITY_LABEL } from '../lib/i18n'
-import { expandEvents, isOpen, isOverdue, newEvent, setPriority } from '../lib/logic'
+import { expandEvents, isOpen, isOverdue, newEvent, normSlots, setPriority } from '../lib/logic'
 import { scheduleSoon } from '../lib/notify'
 import type { Note, PrioritySlot, Task } from '../lib/types'
 
@@ -99,8 +101,8 @@ export function Today() {
             </div>
           </section>
 
-          {/* B. Top three */}
-          <Priorities date={today} slots={dayRec?.priorities || [null, null, null]} tasks={tasks} />
+          {/* B. Top five */}
+          <Priorities date={today} slots={normSlots(dayRec?.priorities)} tasks={tasks} />
 
           {/* C. Timeline */}
           <section className="card" aria-label={L('جدول اليوم', 'Schedule')}>
@@ -132,6 +134,9 @@ export function Today() {
         </div>
 
         <div className="stack">
+          {/* appointments: today + coming week */}
+          <AppointmentsCard />
+
           {/* must complete */}
           <section className="card" aria-label={L('المطلوب إنجازه', 'To complete')}>
             <div className="card-h">
@@ -222,7 +227,7 @@ function ScheduleDialog({ task, onClose }: { task: Task; onClose: () => void }) 
 export function Priorities({ date, slots, tasks, title }: { date: string; slots: (PrioritySlot | null)[]; tasks: Task[]; title?: string }) {
   const { settings } = useApp()
   const [edit, setEdit] = useState<number | null>(null)
-  const filled = [0, 1, 2].map(i => slots[i] || null)
+  const filled = normSlots(slots)
   const toggle = async (i: number) => {
     const s = filled[i]!
     const done = !s.done
@@ -233,8 +238,8 @@ export function Priorities({ date, slots, tasks, title }: { date: string; slots:
     }
   }
   return (
-    <section className="card" aria-label={L('الأولويات الثلاث', 'Top three priorities')}>
-      <div className="card-h"><h2><Star size={18} />{title || L('أهم ثلاث أولويات', 'Top three priorities')}</h2><span className="spacer" /><span className="tiny muted">{filled.filter(s => s?.done).length}/{filled.filter(Boolean).length || 3}</span></div>
+    <section className="card" aria-label={L('أهم 5 أولويات', 'Top five priorities')}>
+      <div className="card-h"><h2><Star size={18} />{title || L('أهم 5 أولويات', 'Top five priorities')}</h2><span className="spacer" /><span className="tiny muted">{filled.filter(s => s?.done).length}/{filled.filter(Boolean).length || 3}</span></div>
       <div className="col">
         {filled.map((s, i) => s ? (
           <div key={i} className={`prio-slot${s.done ? ' done' : ''}`}>
@@ -331,7 +336,7 @@ function InboxCard({ notes }: { notes: Note[] }) {
     editTask({ ...task, updatedAt: Date.now() })
   }
   const toEvent = async (n: Note) => {
-    const e = newEvent({ title: n.text.split('\n')[0].slice(0, 140), notes: n.text, date: todayStr(), startTime: minToHM(Math.ceil((nowMinutes() + 30) / 30) * 30), reminders: settings.defaultReminders })
+    const e = newEvent({ title: n.text.split('\n')[0].slice(0, 140), notes: n.text, date: todayStr(), startTime: minToHM(Math.ceil((nowMinutes() + 30) / 30) * 30), reminders: settings.defaultEventReminders, reminderRepeat: settings.defaultEventRepeat })
     e.endTime = minToHM(hmToMin(e.startTime) + 60)
     await save('events', e)
     await save('notes', { ...n, archived: true, convertedTo: { kind: 'event', id: e.id } })
@@ -404,3 +409,51 @@ function RemindDialog({ note, onClose }: { note: Note; onClose: () => void }) {
 }
 
 export { catName }
+
+// ---------- Appointments (today + next 7 days) ----------
+function AppointmentsCard() {
+  const { settings, quickAdd } = useApp()
+  const events = useEvents() || []
+  const today = todayStr()
+  const [preview, setPreview] = useState<PreviewTarget | null>(null)
+  const inst = expandEvents(events.filter(e => e.type !== 'break'), today, addDays(today, 7), settings.workdays)
+  const order = (a: any, b: any) => a.instanceDate.localeCompare(b.instanceDate) || (a.allDay ? '' : a.startTime || '').localeCompare(b.allDay ? '' : b.startTime || '')
+  const todays = inst.filter(e => e.instanceDate <= today && e.spanEnd >= today).sort(order)
+  const upcoming = inst.filter(e => e.instanceDate > today).sort(order).slice(0, 6)
+  const nowM = nowMinutes()
+  const row = (e: (typeof inst)[number], showDay: boolean) => {
+    const past = !showDay && !e.allDay && e.endTime && hmToMin(e.endTime) <= nowM
+    const live = !showDay && !e.allDay && e.startTime && hmToMin(e.startTime) <= nowM && !past
+    return (
+      <button key={e.id + e.instanceDate} className="list-item" style={{ width: '100%', border: 0, borderBottom: '1px solid var(--line-2)', background: 'none', textAlign: 'start', cursor: 'pointer', opacity: past ? 0.55 : 1 }}
+        onClick={() => setPreview({ kind: 'event', event: e, date: e.instanceDate })}>
+        <span className="dot" style={{ ['--c' as any]: typeColor(e.type, settings.typeColors), alignSelf: 'flex-start', marginTop: 8 }} />
+        <span className="col" style={{ gap: 0, minWidth: 74, alignItems: 'flex-start' }}>
+          {showDay && <b className="tiny">{relDay(e.instanceDate, today)}</b>}
+          <span className="iso small nowrap" style={{ fontWeight: 700, color: live ? 'var(--teal)' : undefined }}>{e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}</span>
+        </span>
+        <span className="grow">
+          <span style={{ fontWeight: 650, display: 'block' }}>{e.title}{live && <span className="pill teal" style={{ marginInlineStart: 6 }}>{L('الآن', 'Now')}</span>}</span>
+          {e.location && <span className="tiny muted">{e.location}</span>}
+        </span>
+        {!!e.reminders?.length && <Bell size={14} className="muted" aria-label={L('عليه تذكير', 'Has reminder')} />}
+      </button>
+    )
+  }
+  return (
+    <section className="card" aria-label={L('مواعيدي', 'My appointments')}>
+      <div className="card-h">
+        <h2><CalendarClock size={18} />{L('مواعيدي', 'My appointments')}</h2>
+        <span className="spacer" />
+        <button className="btn icon sm" onClick={() => quickAdd({ kind: 'event', date: today })} aria-label={L('موعد جديد', 'New event')}><Plus size={16} /></button>
+      </div>
+      <div className="section-title" style={{ marginTop: 0 }}>{L('اليوم', 'Today')} ({todays.length})</div>
+      {todays.length === 0 ? <p className="small muted" style={{ margin: '0 0 6px' }}>{L('لا مواعيد اليوم.', 'No appointments today.')}</p> : todays.map(e => row(e, false))}
+      {upcoming.length > 0 && <>
+        <div className="section-title" style={{ marginTop: 12 }}>{L('القادمة (7 أيام)', 'Coming up (7 days)')}</div>
+        {upcoming.map(e => row(e, true))}
+      </>}
+      {preview && <ItemPreview target={preview} onClose={() => setPreview(null)} />}
+    </section>
+  )
+}

@@ -3,9 +3,10 @@ import type { ReactNode } from 'react'
 import { useApp } from '../app-context'
 import { addDays, diffDays, fmtDuration, fmtLong, fmtShort, fmtTime, relDay, todayStr } from '../lib/dates'
 import { save, useCategories, useEvents, useProjects, useTasks } from '../lib/db'
-import { EVENT_TYPE_LABEL, L, PRIORITY_LABEL, REMINDER_OPTIONS, STATUS_LABEL } from '../lib/i18n'
+import { EVENT_TYPE_LABEL, L, PRIORITY_LABEL, STATUS_LABEL } from '../lib/i18n'
+import { remLabel, remSort, repeatLabel } from '../lib/reminders'
 import { isOverdue } from '../lib/logic'
-import type { CalEvent, Recurrence, Task } from '../lib/types'
+import type { CalEvent, Recurrence, ReminderRepeat, ReminderSpec, Task } from '../lib/types'
 import { typeColor } from './EventEditor'
 import { quickComplete } from './TaskRow'
 import { CheckIcon } from './TaskEditor'
@@ -24,8 +25,8 @@ function recurrenceText(r: Recurrence) {
   else s = L('سنوياً', 'Yearly')
   return r.until ? `${s} · ${L('حتى', 'until')} ${fmtShort(r.until)}` : s
 }
-const reminderText = (list?: number[]) =>
-  (list || []).slice().sort((a, b) => a - b).map(v => REMINDER_OPTIONS().find(o => o.v === v)?.l || L(`قبل ${v} دقيقة`, `${v} min before`)).join('، ')
+const reminderText = (list?: ReminderSpec[], rep?: ReminderRepeat | null) =>
+  [(list || []).slice().sort(remSort).map(remLabel).join('، '), repeatLabel(rep)].filter(Boolean).join(' · ')
 
 /** "اليوم / غداً / بعد 3 أيام / قبل يومين" */
 function relText(d: string, today: string) {
@@ -78,7 +79,7 @@ export function ItemPreview({ target, onClose }: { target: PreviewTarget; onClos
       <Line icon={<Clock size={17} />}>{event.allDay ? L('طوال اليوم', 'All day') : <span style={{ unicodeBidi: 'isolate' }}>{fmtTime(event.startTime)} – {fmtTime(event.endTime)}</span>}</Line>
       {event.location && <Line icon={<MapPin size={17} />}>{event.location}</Line>}
       {event.recurrence && <Line icon={<Repeat size={17} />}>{recurrenceText(event.recurrence)}</Line>}
-      {!!event.reminders?.length && <Line icon={<Bell size={17} />}>{reminderText(event.reminders)}</Line>}
+      {!!event.reminders?.length && <Line icon={<Bell size={17} />}>{reminderText(event.reminders, event.reminderRepeat)}</Line>}
       {event.notes && <Line icon={<StickyNote size={17} />}><div style={{ whiteSpace: 'pre-wrap' }}>{event.notes}</div></Line>}
     </>
   } else {
@@ -97,7 +98,7 @@ export function ItemPreview({ target, onClose }: { target: PreviewTarget; onClos
       {t.projectId && <Line icon={<FolderKanban size={17} />}>{projects.find(p => p.id === t.projectId)?.name}</Line>}
       {(t.followUpDate || t.contact) && <Line icon={<UserRound size={17} />}>{L('متابعة', 'Follow up')}{t.contact ? ` ${L('مع', 'with')} ${t.contact}` : ''}{t.followUpDate ? ` · ${relDay(t.followUpDate, today)}` : ''}</Line>}
       {t.recurrence && <Line icon={<Repeat size={17} />}>{recurrenceText(t.recurrence)}</Line>}
-      {!!t.reminders?.length && <Line icon={<Bell size={17} />}>{reminderText(t.reminders)}</Line>}
+      {!!t.reminders?.length && <Line icon={<Bell size={17} />}>{reminderText(t.reminders, t.reminderRepeat)}</Line>}
       {!!t.subtasks?.length && <Line icon={<ListChecks size={17} />}>
         <div className="small muted" style={{ marginBottom: 4 }}>{L('المهام الفرعية', 'Subtasks')} <span className="ltr">{subDone}/{t.subtasks.length}</span></div>
         <div className="col" style={{ gap: 4 }}>

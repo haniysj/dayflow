@@ -3,7 +3,8 @@ import { useRef, useState } from 'react'
 import { useApp } from '../app-context'
 import { addDays, isValidDate, isValidTime, startOfWeek, todayStr, hmToMin, fmtShort, fmtNumeric } from '../lib/dates'
 import { remove, save, uid, useCategories, useProjects } from '../lib/db'
-import { L, PRIORITY_LABEL, REMINDER_OPTIONS, STATUS_LABEL } from '../lib/i18n'
+import { L, PRIORITY_LABEL, STATUS_LABEL } from '../lib/i18n'
+import { ReminderPicker } from './ReminderPicker'
 import { completeTask, newTask, reopenTask } from '../lib/logic'
 import { scheduleSoon } from '../lib/notify'
 import type { Priority, Recurrence, Task, TaskStatus } from '../lib/types'
@@ -140,13 +141,7 @@ export function TaskEditor({ task, onClose }: { task: Task | Partial<Task>; onCl
         </label>
       </div>
       <div className="field"><span>{L('التذكير', 'Reminders')}</span>
-        <div className="row wrap">
-          {REMINDER_OPTIONS().map(o => {
-            const on = t.reminders?.includes(o.v)
-            return <button key={o.v} type="button" className={`fchip${on ? ' on' : ''}`} aria-pressed={on}
-              onClick={() => up({ reminders: on ? t.reminders!.filter(x => x !== o.v) : [...(t.reminders || []), o.v] })}>{o.l}</button>
-          })}
-        </div>
+        <ReminderPicker timed={!!t.startTime} dayPresets={!!t.dueDate} value={t.reminders || []} onChange={v => up({ reminders: v })} repeat={t.reminderRepeat} onRepeat={r => up({ reminderRepeat: r })} />
         {!t.startTime && !!t.reminders?.length && <span className="tiny muted">{L(`بدون وقت محدد، يُحسب التذكير من الساعة ${settings.defaultReminderTime}`, `Without a time, reminders count from ${settings.defaultReminderTime}`)}</span>}
       </div>
 

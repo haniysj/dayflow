@@ -5,7 +5,8 @@ import { Modal, toast } from '../components/ui'
 import { addDays, dow, fmtLong, fmtTime, relDay, todayStr } from '../lib/dates'
 import { db, save, useEvents, useTasks } from '../lib/db'
 import { L, PRIORITY_LABEL } from '../lib/i18n'
-import { expandEvents, isOpen, rescheduleTask } from '../lib/logic'
+import { emptySlots, expandEvents, isOpen, normSlots, rescheduleTask } from '../lib/logic'
+import { PRIORITY_SLOTS } from '../lib/types'
 import { scheduleSoon } from '../lib/notify'
 
 export function PlanTomorrow({ onClose }: { onClose: () => void }) {
@@ -24,13 +25,13 @@ export function PlanTomorrow({ onClose }: { onClose: () => void }) {
   const [prios, setPrios] = useState<string[] | null>(null)
   const chosen = prios ?? []
   const appts = expandEvents(events, target, target, settings.workdays).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
-  const pick = (id: string) => setPrios(chosen.includes(id) ? chosen.filter(x => x !== id) : chosen.length >= 3 ? chosen : [...chosen, id])
+  const pick = (id: string) => setPrios(chosen.includes(id) ? chosen.filter(x => x !== id) : chosen.length >= PRIORITY_SLOTS ? chosen : [...chosen, id])
 
   const submit = async () => {
     for (const t of leftover.filter(t => moveSet.has(t.id))) await rescheduleTask(t, target)
-    const day = (await db.days.get(target)) || { id: target, updatedAt: 0, priorities: [null, null, null] }
-    const existing = (day.deleted ? [null, null, null] : day.priorities) as any[]
-    const slots = [0, 1, 2].map(i => {
+    const day = (await db.days.get(target)) || { id: target, updatedAt: 0, priorities: emptySlots() }
+    const existing = (day.deleted ? emptySlots() : normSlots(day.priorities)) as any[]
+    const slots = existing.map((_, i) => {
       const id = chosen[i]
       if (!id) return existing[i] || null
       const t = targetTasks.find(x => x.id === id)!
@@ -75,12 +76,12 @@ export function PlanTomorrow({ onClose }: { onClose: () => void }) {
       </div>
 
       <div>
-        <div className="section-title">3. {L('اختر حتى ثلاث أولويات', 'Pick up to three priorities')} ({chosen.length}/3)</div>
+        <div className="section-title">3. {L('اختر حتى 5 أولويات', 'Pick up to five priorities')} ({chosen.length}/{PRIORITY_SLOTS})</div>
         {targetTasks.length === 0 ? <p className="small muted" style={{ margin: 0 }}>{L('لا مهام لهذا اليوم بعد — يمكنك تحديد الأولويات لاحقاً من صفحة اليوم.', 'No tasks for that day yet — you can set priorities later on the Today page.')}</p> : (
           <div className="row wrap">
             {targetTasks.map(t => {
               const i = chosen.indexOf(t.id)
-              return <button key={t.id} className={`fchip${i >= 0 ? ' on' : ''}`} aria-pressed={i >= 0} disabled={i < 0 && chosen.length >= 3} onClick={() => pick(t.id)}>{i >= 0 ? <b>{i + 1}</b> : <Star size={13} />}{t.title}</button>
+              return <button key={t.id} className={`fchip${i >= 0 ? ' on' : ''}`} aria-pressed={i >= 0} disabled={i < 0 && chosen.length >= PRIORITY_SLOTS} onClick={() => pick(t.id)}>{i >= 0 ? <b>{i + 1}</b> : <Star size={13} />}{t.title}</button>
             })}
           </div>
         )}

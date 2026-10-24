@@ -201,7 +201,7 @@ function PlannerPages({ sundays, opts }: { sundays: string[]; opts: Opts }) {
               <MiniMonth month={startOfMonth(addDays(s, 2))} weekStart={s} rtl={rtl} holidays={new Set(holidays.flatMap(h => (h.official ? range(h.start, h.end) : [])))} />
               <div className="pl-prio" dir={rtl ? 'rtl' : 'ltr'}>
                 <div className="pl-label">{L('أهم أولويات الأسبوع', 'Top priorities this week')}</div>
-                {[1, 2, 3].map(n => <div key={n} className="pl-prio-line"><span>{n}</span></div>)}
+                {[1, 2, 3, 4, 5].map(n => <div key={n} className="pl-prio-line"><span>{n}</span></div>)}
               </div>
               <div className="pl-title" dir={rtl ? 'rtl' : 'ltr'}>
                 <div className="pl-app">{settings.appName}</div>

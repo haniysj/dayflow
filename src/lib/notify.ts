@@ -1,9 +1,10 @@
-import { addDays, dow, hmToMin, minToHM, range, todayStr, zonedToMs, msToDate, msToHM } from './dates'
+import { addDays, diffDays, dow, fmtTime, hmToMin, minToHM, range, todayStr, zonedToMs, msToDate, msToHM } from './dates'
+import { isDayRem, remFireAt, remKey } from './reminders'
 import { alive, db, getSettings, save } from './db'
 import { L } from './i18n'
 import { expandEvents, isOpen } from './logic'
 import { backendConfigured, getToken, pushSubCount, removePushSub, savePushSub, setRemoteSchedule, syncEnabled } from './sync'
-import type { Settings } from './types'
+import type { ReminderRepeat, Settings } from './types'
 
 export interface ReminderItem { id: string; at: number; title: string; body: string; url: string; cat: 'tasks' | 'events' | 'planning' | 'leave' }
 
@@ -46,26 +47,61 @@ export async function buildSchedule(days = 8): Promise<ReminderItem[]> {
     const at = applyQuiet(it.at, s)
     if (at > now - 10 * 60000 && at < zonedToMs(end, '23:59')) out.push({ ...it, at })
   }
+  /** "اليوم / غداً / بعد 3 أيام" relative to the day the alert fires */
+  const whenLabel = (date: string, from: string) => {
+    const n = diffDays(date, from)
+    return n === 0 ? L('اليوم', 'today') : n === 1 ? L('غداً', 'tomorrow') : n === 2 ? L('بعد يومين', 'in 2 days') : L(`بعد ${n} أيام`, `in ${n} days`)
+  }
   const offLabel = (m: number) => m === 0 ? L('الآن', 'now') : m < 60 ? L(`بعد ${m} دقيقة`, `in ${m} min`) : m < 1440 ? L(`بعد ${m / 60} ساعة`, `in ${m / 60} h`) : L('غداً', 'tomorrow')
+
+  const acks: Record<string, number> = (await db.meta.get('acks'))?.value || {}
+  /** one alert + its repeats (repeats stop once the alert is acknowledged, or once a timed item has started) */
+  // two reminders of the same item landing on the same minute → one alert
+  const seen = new Set<string>()
+  const addOnce = (it: ReminderItem, group: string) => {
+    const k = `${group}|${Math.floor(it.at / 60000)}`
+    if (seen.has(k)) return
+    seen.add(k)
+    add(it)
+  }
+  const addWithRepeats = (group: string, it: ReminderItem, rep: ReminderRepeat | null | undefined, stopAt: number | null) => {
+    addOnce(it, group)
+    if (!rep?.count || !rep.every || acks[it.id]) return
+    for (let k = 1; k <= Math.min(rep.count, 10); k++) {
+      const at = it.at + k * rep.every * 60000
+      if (stopAt && at > stopAt) break
+      addOnce({ ...it, id: `${it.id}~r${k}`, at, url: it.url }, group)
+    }
+  }
 
   const tasks = alive(await db.tasks.toArray()).filter(isOpen)
   for (const t of tasks) {
     if (!t.dueDate || t.dueDate > end || !t.reminders?.length) continue
-    const base = zonedToMs(t.dueDate, t.startTime || s.defaultReminderTime)
-    for (const m of t.reminders)
-      add({ id: `t:${t.id}:${t.dueDate}:${t.startTime || ''}:${m}`, at: base - m * 60000, title: t.title,
-        body: t.startTime ? `${L('مهمة', 'Task')} · ${offLabel(m)}` : L('مهمة مستحقة اليوم', 'Task due today'), url: `/?task=${t.id}`, cat: 'tasks' })
+    for (const r of t.reminders) {
+      const at = remFireAt(r, t.dueDate, t.startTime, !t.startTime, s.defaultReminderTime)
+      if (at == null) continue
+      const id = `t:${t.id}:${t.dueDate}:${t.startTime || ''}:${remKey(r)}`
+      addWithRepeats(`t:${t.id}:${t.dueDate}`, { id, at, title: t.title,
+        body: isDayRem(r) ? `${L('مهمة', 'Task')} · ${whenLabel(t.dueDate, msToDate(at))}${t.startTime ? ' · ' + fmtTime(t.startTime) : ''}` : t.startTime ? `${L('مهمة', 'Task')} · ${offLabel(r)}` : L('مهمة مستحقة اليوم', 'Task due today'),
+        url: `/?task=${t.id}&r=${encodeURIComponent(id)}`, cat: 'tasks' }, t.reminderRepeat, t.startTime ? zonedToMs(t.dueDate, t.startTime) : null)
+    }
     if (t.followUpDate && t.followUpDate >= today && t.followUpDate <= end)
       add({ id: `f:${t.id}:${t.followUpDate}`, at: zonedToMs(t.followUpDate, s.defaultReminderTime), title: L('متابعة: ', 'Follow up: ') + t.title,
         body: t.contact ? L(`مع ${t.contact}`, `with ${t.contact}`) : L('موعد المتابعة اليوم', 'Follow-up due today'), url: `/?task=${t.id}`, cat: 'tasks' })
   }
   const events = alive(await db.events.toArray())
-  for (const e of expandEvents(events, today, end, s.workdays)) {
+  // look one extra day ahead so "day before" alerts for the day after the window are included
+  for (const e of expandEvents(events, today, addDays(end, 1), s.workdays)) {
     if (!e.reminders?.length) continue
-    const base = zonedToMs(e.instanceDate, e.allDay ? s.defaultReminderTime : e.startTime || '09:00')
-    for (const m of e.reminders)
-      add({ id: `e:${e.id}:${e.instanceDate}:${e.startTime || ''}:${m}`, at: base - m * 60000, title: e.title,
-        body: [e.allDay ? L('طوال اليوم', 'All day') : offLabel(m), e.location].filter(Boolean).join(' · '), url: `/?event=${e.id}&d=${e.instanceDate}`, cat: 'events' })
+    const startMs = e.allDay ? null : zonedToMs(e.instanceDate, e.startTime || '09:00')
+    for (const r of e.reminders) {
+      const at = remFireAt(r, e.instanceDate, e.startTime, e.allDay, s.defaultReminderTime)
+      if (at == null) continue
+      const id = `e:${e.id}:${e.instanceDate}:${e.startTime || ''}:${remKey(r)}`
+      const when = isDayRem(r) ? `${whenLabel(e.instanceDate, msToDate(at))} · ${e.allDay ? L('طوال اليوم', 'All day') : fmtTime(e.startTime)}` : e.allDay ? L('طوال اليوم', 'All day') : offLabel(r)
+      addWithRepeats(`e:${e.id}:${e.instanceDate}`, { id, at, title: e.title, body: [when, e.location].filter(Boolean).join(' · '),
+        url: `/?event=${e.id}&d=${e.instanceDate}&r=${encodeURIComponent(id)}`, cat: 'events' }, e.reminderRepeat, startMs)
+    }
   }
   const notes = alive(await db.notes.toArray())
   for (const n of notes) if (n.remindAt && !n.archived) {
@@ -74,7 +110,7 @@ export async function buildSchedule(days = 8): Promise<ReminderItem[]> {
   }
   for (const d of range(today, end)) {
     const work = s.workdays.includes(dow(d))
-    if (s.morningEnabled && work) add({ id: `m:${d}`, at: zonedToMs(d, s.morningTime), title: L('خطّط ليومك', 'Plan your day'), body: L('اختر أولوياتك الثلاث وراجع جدول اليوم', 'Pick your top three and review today’s schedule'), url: '/?view=today', cat: 'planning' })
+    if (s.morningEnabled && work) add({ id: `m:${d}`, at: zonedToMs(d, s.morningTime), title: L('خطّط ليومك', 'Plan your day'), body: L('اختر أولوياتك الخمس وراجع جدول اليوم', 'Pick your top five and review today’s schedule'), url: '/?view=today', cat: 'planning' })
     if (s.eveningEnabled && work) add({ id: `r:${d}`, at: zonedToMs(d, s.eveningTime), title: L('مراجعة نهاية اليوم', 'End-of-day review'), body: L('دقيقتان لمراجعة يومك وتحديد أهم مهمة للغد', 'Two minutes to review today and pick tomorrow’s key task'), url: '/?review=1', cat: 'planning' })
     if (s.weeklyEnabled && dow(d) === s.weeklyDay) add({ id: `w:${d}`, at: zonedToMs(d, s.weeklyTime), title: L('المراجعة الأسبوعية', 'Weekly review'), body: L('راجع المعلّق وخطط للأسبوع القادم', 'Review open items and plan next week'), url: '/?view=reports&weekly=1', cat: 'planning' })
   }
@@ -116,8 +152,18 @@ const saveCenter = (x: CenterItem[]) => { localStorage.setItem(CENTER, JSON.stri
 const centerSubs = new Set<() => void>()
 export const onCenter = (f: () => void) => { centerSubs.add(f); return () => { centerSubs.delete(f) } }
 
-export function dismissCenter(id: string) { saveCenter(centerItems().map(i => (i.id === id ? { ...i, dismissed: true } : i))) }
-export function clearCenter() { saveCenter(centerItems().map(i => ({ ...i, dismissed: true }))) }
+export function dismissCenter(id: string) { saveCenter(centerItems().map(i => (i.id === id ? { ...i, dismissed: true } : i))); ackReminder(id) }
+/** Stop the remaining repeats of an alert (synced, so other devices and the push server drop them too) */
+export async function ackReminder(id: string) {
+  const base = id.split('~')[0]
+  const cur = (await db.meta.get('acks'))?.value || {}
+  if (cur[base]) return
+  cur[base] = Date.now()
+  for (const k of Object.keys(cur)) if (cur[k] < Date.now() - 14 * 86400000) delete cur[k]
+  await save('meta', { id: 'acks', value: cur })
+  scheduleSoon()
+}
+export function clearCenter() { const items = centerItems(); saveCenter(items.map(i => ({ ...i, dismissed: true }))); items.filter(i => !i.dismissed).forEach(i => ackReminder(i.id)) }
 
 export async function snooze(item: ReminderItem, minutes: number | 'tomorrow') {
   const s = await getSettings()

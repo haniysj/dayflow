@@ -20,6 +20,11 @@ export interface Recurrence {
   workdaysOnly?: boolean
 }
 
+/** A reminder: minutes before the start (number), or "d days before, at HH:mm" */
+export type ReminderSpec = number | { d: number; t: string }
+/** Repeat each alert `count` more times, every `every` minutes */
+export interface ReminderRepeat { every: number; count: number }
+
 export interface Subtask { id: ID; title: string; done: boolean }
 
 export interface Task extends Base {
@@ -36,7 +41,8 @@ export interface Task extends Base {
   actualMin?: number | null
   priority: Priority
   status: TaskStatus
-  reminders?: number[] // minutes before start (or before default reminder time)
+  reminders?: ReminderSpec[] // minutes before start (or before default reminder time), or day+time
+  reminderRepeat?: ReminderRepeat | null
   recurrence?: Recurrence | null
   notes?: string
   links?: string[]
@@ -67,7 +73,8 @@ export interface CalEvent extends Base {
   notes?: string
   categoryId?: ID | null
   recurrence?: Recurrence | null
-  reminders?: number[]
+  reminders?: ReminderSpec[]
+  reminderRepeat?: ReminderRepeat | null
   exDates?: string[] // skipped occurrences
 }
 
@@ -103,6 +110,9 @@ export interface Note extends Base {
   remindAt?: string | null // ISO local "YYYY-MM-DDTHH:mm"
 }
 
+/** Number of daily top-priority slots */
+export const PRIORITY_SLOTS = 5
+
 export interface PrioritySlot {
   title: string
   desc?: string
@@ -123,7 +133,7 @@ export interface DayReview {
 
 export interface DayRecord extends Base {
   // id = YYYY-MM-DD
-  priorities: (PrioritySlot | null)[] // exactly 3
+  priorities: (PrioritySlot | null)[] // exactly PRIORITY_SLOTS (5)
   review?: DayReview | null
   planned?: ID[] // tasks planned for this day at "plan tomorrow" time (for planned-vs-completed)
 }
@@ -177,6 +187,8 @@ export interface Settings {
   // notifications
   notifyEnabled: boolean
   defaultReminders: number[]
+  defaultEventReminders: ReminderSpec[]
+  defaultEventRepeat: ReminderRepeat | null
   defaultReminderTime: string // for untimed tasks
   quietStart: string
   quietEnd: string

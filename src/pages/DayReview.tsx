@@ -5,7 +5,7 @@ import { Modal, toast } from '../components/ui'
 import { addDays, fmtLong, msToDate } from '../lib/dates'
 import { db, save, useDay, useTasks } from '../lib/db'
 import { L } from '../lib/i18n'
-import { isOpen, rescheduleTask, setPriority } from '../lib/logic'
+import { emptySlots, isOpen, normSlots, rescheduleTask, setPriority } from '../lib/logic'
 import type { DayReview as Review } from '../lib/types'
 
 export function DayReview({ date, onClose }: { date: string; onClose: () => void }) {
@@ -22,14 +22,14 @@ export function DayReview({ date, onClose }: { date: string; onClose: () => void
   const candidates = tasks.filter(t => isOpen(t) && (!t.dueDate || t.dueDate <= tomorrow))
 
   const submit = async () => {
-    const d = (await db.days.get(date)) || { id: date, updatedAt: 0, priorities: [null, null, null] }
+    const d = (await db.days.get(date)) || { id: date, updatedAt: 0, priorities: emptySlots() }
     await save('days', { ...d, deleted: 0, review: { ...rev, doneAt: Date.now() } })
     if (rev.tomorrowTaskId) {
       const t = tasks.find(x => x.id === rev.tomorrowTaskId)
       if (t) {
         if (t.dueDate !== tomorrow) await rescheduleTask(t, tomorrow)
         const td = await db.days.get(tomorrow)
-        const slots = td && !td.deleted ? td.priorities : [null, null, null]
+        const slots = td && !td.deleted ? normSlots(td.priorities) : emptySlots()
         if (!slots.some(s => s?.taskId === t.id)) {
           const idx = slots.findIndex(s => !s)
           if (idx >= 0) await setPriority(tomorrow, idx, { title: t.title, taskId: t.id, priority: t.priority, estMin: t.estMin, done: false })
@@ -37,7 +37,7 @@ export function DayReview({ date, onClose }: { date: string; onClose: () => void
       }
     } else if (rev.tomorrowText?.trim()) {
       const td = await db.days.get(tomorrow)
-      const slots = td && !td.deleted ? td.priorities : [null, null, null]
+      const slots = td && !td.deleted ? normSlots(td.priorities) : emptySlots()
       const idx = slots.findIndex(s => !s)
       if (idx >= 0) await setPriority(tomorrow, idx, { title: rev.tomorrowText.trim(), priority: 'high', done: false })
     }
