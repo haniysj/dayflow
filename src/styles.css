@@ -126,6 +126,7 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.3; font-weight: 750; }
 .pill.rose { background: var(--rose-bg); color: var(--rose); }
 .pill.saffron { background: var(--saffron-bg); color: color-mix(in srgb, var(--saffron) 70%, var(--ink)); }
 .pill.overdue { background: var(--overdue-bg); color: var(--overdue); }
+.pill.est { background: color-mix(in srgb, #7C5CD6 14%, var(--card)); color: color-mix(in srgb, #7C5CD6 85%, var(--ink)); }
 .pill.outline { background: none; border: 1px dashed var(--line); color: var(--muted); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); flex-shrink: 0; }
 .pulse { position: relative; }

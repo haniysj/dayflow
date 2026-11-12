@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CalendarArrowUp, CalendarClock, Clock, Hourglass, MoreHorizontal, Repeat, Star, Trash2, UserRound, ListChecks } from 'lucide-react'
+import { ArrowLeftRight, CalendarArrowUp, CalendarClock, Clock, Hourglass, MoreHorizontal, Repeat, Star, Timer, Trash2, UserRound, ListChecks } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useApp } from '../app-context'
 import { addDays, fmtDuration, fmtTime, relDay, todayStr } from '../lib/dates'
@@ -90,8 +90,8 @@ export function TaskRow({ t, cats, projects, showDate = true, selectable, select
           {showDate && t.dueDate && <span className={`pill${overdue ? ' overdue' : ''}`}><CalendarClock size={12} />{relDay(t.dueDate, today)}</span>}
           {overdue && <span className="pill overdue">{L('متأخرة', 'Overdue')}</span>}
           {!t.dueDate && <span className="pill outline">{L('بدون تاريخ', 'No date')}</span>}
-          {t.startTime && <span className="pill"><Clock size={12} /><span className="iso">{fmtTime(t.startTime)}</span></span>}
-          {t.estMin ? <span className="pill">{fmtDuration(t.estMin)}</span> : null}
+          {t.startTime && <span className="pill" title={L('وقت المهمة', 'Task time')}><Clock size={12} /><span className="iso">{fmtTime(t.startTime)}</span>{t.endTime && t.endTime !== t.startTime && <> – <span className="iso">{fmtTime(t.endTime)}</span></>}</span>}
+          {t.estMin ? <span className="pill est" title={L('المدة المقدّرة', 'Estimated time')}><Timer size={12} />{fmtDuration(t.estMin)}</span> : null}
           {t.status === 'waiting' && <span className="pill saffron"><Hourglass size={12} />{L('بانتظار رد', 'Waiting')}{t.contact ? ` · ${t.contact}` : ''}</span>}
           {t.status === 'in_progress' && <span className="pill teal">{L('قيد التنفيذ', 'In progress')}</span>}
           {t.followUpDate && t.status !== 'completed' && <span className={`pill${t.followUpDate <= today ? ' saffron' : ''}`}><UserRound size={12} />{L('متابعة', 'Follow-up')} {relDay(t.followUpDate, today)}</span>}
