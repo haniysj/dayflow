@@ -1,3 +1,4 @@
+import { BUILD, checkForUpdate } from '../lib/appUpdate'
 import {
   Bell, BellRing, Cloud, Database, Download, Globe, KeyRound, LogOut, Palette, Palmtree, RefreshCw, Smartphone, Trash2, Upload, FolderKanban,
   ShieldCheck, Info, Send,
@@ -73,6 +74,9 @@ function General({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void 
             {['Asia/Muscat', 'Asia/Dubai', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Bahrain', 'Asia/Kuwait', 'Europe/London', 'UTC'].map(z => <option key={z} value={z}>{z}</option>)}
           </select>
         </Row>
+        <Row title={L('إصدار التطبيق', 'App version')} hint={<>{L('تاريخ الإصدار', 'Build')}: <span className="iso">{BUILD}</span></>}>
+          <UpdateButton />
+        </Row>
       </Card>
       <Card title={L('أيام وساعات العمل', 'Work days & hours')}>
         <Row title={L('أول يوم في الأسبوع', 'First day of week')}><select className="input" style={{ width: 150 }} value={s.weekStart} onChange={e => set({ weekStart: +e.target.value })}>{DAYS().map((d, i) => <option key={i} value={i}>{d}</option>)}</select></Row>
@@ -90,6 +94,11 @@ function General({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void 
       <InstallCard />
     </>
   )
+}
+
+function UpdateButton() {
+  const [busy, setBusy] = useState(false)
+  return <button className="btn sm" disabled={busy} onClick={async () => { setBusy(true); await checkForUpdate(); setBusy(false) }}>{busy ? L('جارٍ التحقق…', 'Checking…') : L('التحقق من وجود تحديث', 'Check for update')}</button>
 }
 
 function InstallCard() {

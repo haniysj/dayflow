@@ -12,6 +12,7 @@ import { scheduleSoon, startReminders } from './lib/notify'
 import { firstRunSeed, mergeOfficialHolidays } from './lib/seed'
 import { afterSync, startSyncLoop } from './lib/sync'
 import { setTimeZone } from './lib/dates'
+import { setUpdater } from './lib/appUpdate'
 
 async function boot() {
   try {
@@ -40,9 +41,17 @@ async function boot() {
 
   const updateSW = registerSW({
     onNeedRefresh() {
-      toast(L('يتوفر إصدار جديد من التطبيق', 'A new version is available'), { ms: 30000, action: { label: L('تحديث', 'Update'), fn: () => updateSW(true) } })
+      toast(L('يتوفر إصدار جديد من التطبيق', 'A new version is available'), { ms: 10 * 60000, action: { label: L('تحديث', 'Update'), fn: () => updateSW(true) } })
     },
     onOfflineReady() { toast(L('التطبيق جاهز للعمل دون اتصال', 'Ready to work offline')) },
+    // an installed app is often resumed rather than reloaded, so look for a new version on resume and every 20 minutes
+    onRegisteredSW(_url, reg) {
+      setUpdater(reg, updateSW)
+      if (!reg) return
+      const check = () => { if (navigator.onLine) reg.update().catch(() => {}) }
+      setInterval(check, 20 * 60000)
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
+    },
   })
 }
 boot()
