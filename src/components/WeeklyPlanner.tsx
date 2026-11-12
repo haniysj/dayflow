@@ -7,8 +7,9 @@ import {
 } from '../lib/dates'
 import { useEvents, useHolidays, useLeaves, useTasks } from '../lib/db'
 import { getLang, L, LEAVE_TYPE_LABEL } from '../lib/i18n'
+import { printPages, savePdf } from '../lib/printPdf'
 import { expandEvents } from '../lib/logic'
-import { FileIcon, Modal, PrintIcon, Seg, Switch, toast } from './ui'
+import { FileIcon, Modal, PrintIcon, Seg, Switch } from './ui'
 
 /* Physical layout on paper (independent of RTL/LTR):
    header  = [month calendar | week priorities | title]  → calendar sits top-LEFT
@@ -45,74 +46,9 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
 
   const setMonth = (m: string) => up({ month: m, startWeek: weeksOfMonth(m)[0] })
 
-  const doPrint = async () => {
-    setBusy('print')
-    await document.fonts?.ready
-    const style = document.createElement('style')
-    style.textContent = '@page { size: A4 portrait; margin: 0 }'
-    document.head.appendChild(style)
-    document.body.classList.add('pl-printing')
-    const done = () => { document.body.classList.remove('pl-printing'); style.remove(); setBusy(''); window.removeEventListener('afterprint', done) }
-    window.addEventListener('afterprint', done)
-    setTimeout(() => { window.print(); setTimeout(done, 1500) }, 60)
-  }
-
-  /** Collect the CSS rules the planner sheet uses (".pl-…"), skipping @media print blocks */
-  const plannerCss = () => {
-    const out: string[] = []
-    for (const sheet of Array.from(document.styleSheets)) {
-      let rules: CSSRuleList
-      try { rules = sheet.cssRules } catch { continue }
-      for (const r of Array.from(rules)) if (r instanceof CSSStyleRule && /\.pl-|#pl-print-root/.test(r.selectorText)) out.push(r.cssText)
-    }
-    return out.join('\n')
-  }
   const fileName = `dayflow-planner-${opts.startWeek}.pdf`
-  const download = (blob: Blob) => {
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob); a.download = fileName
-    document.body.appendChild(a); a.click()
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 4000)
-  }
-
-  /** Vector PDF (real text) rendered by the server; image PDF only as an offline fallback */
-  const doPdf = async () => {
-    setBusy('pdf')
-    try {
-      if (!navigator.onLine) throw new Error('offline')
-      const r = await fetch('/api/pdf', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: printRoot.current?.innerHTML || '', css: plannerCss(), lang: getLang(), name: fileName }),
-      })
-      if (!r.ok || !(r.headers.get('content-type') || '').includes('pdf')) throw new Error('server ' + r.status)
-      download(await r.blob())
-      toast(L('حُفظ ملف PDF', 'PDF saved'))
-    } catch (e) {
-      console.warn('server pdf failed, using image fallback', e)
-      await imagePdf()
-    }
-    setBusy('')
-  }
-
-  const imagePdf = async () => {
-    try {
-      await document.fonts?.ready
-      const [{ jsPDF }, h2c] = await Promise.all([import('jspdf'), import('html2canvas-pro')])
-      const html2canvas = (h2c as any).default || h2c
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
-      const pages = [...(printRoot.current?.querySelectorAll<HTMLElement>('.pl-page') || [])]
-      for (let i = 0; i < pages.length; i++) {
-        const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false })
-        if (i) pdf.addPage()
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PAGE_W, PAGE_H, `p${i}`)
-      }
-      download(pdf.output('blob'))
-      toast(L('حُفظ PDF كصورة (دون اتصال). للحصول على نص واضح أعد الحفظ عند الاتصال بالإنترنت.', 'Saved as an image PDF (offline). Save again when online for crisp text.'), { ms: 6000 })
-    } catch (e) {
-      console.error(e)
-      toast(L('تعذّر إنشاء PDF — جرّب زر الطباعة ثم «حفظ كـ PDF»', 'Could not create PDF — use Print → Save as PDF'), { err: true })
-    }
-  }
+  const doPrint = () => { setBusy('print'); printPages('portrait', () => setBusy('')) }
+  const doPdf = async () => { setBusy('pdf'); await savePdf(printRoot.current, fileName, 'portrait'); setBusy('') }
 
   const previewScale = Math.min(0.42, (Math.min(window.innerWidth, 560) - 70) / (PAGE_W * MM))
 

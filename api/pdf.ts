@@ -1,4 +1,4 @@
-// Vector A4 PDF renderer for the printable planner (real, selectable Arabic text in Cairo).
+// Vector A4 PDF renderer for the printable sheets (planner, year calendar) (real, selectable Arabic text in Cairo).
 // The client posts the planner pages' HTML + their CSS; headless Chromium lays them out and prints to PDF.
 // Hardening: JavaScript is disabled and every network request is blocked (only data: URLs load),
 // so the page can't fetch anything; input size is capped. Nothing is stored.
@@ -42,7 +42,7 @@ const SAMPLE = `<section class="pl-page" dir="rtl" style="padding:20mm"><h1 styl
 export default async function handler(req: any, res: any) {
   const selftest = req.method === 'GET' && req.query?.selftest === '1'
   if (req.method !== 'POST' && !selftest) return res.status(405).json({ error: 'method' })
-  let html = SAMPLE, css = '', lang = 'ar', name = 'dayflow-planner.pdf'
+  let html = SAMPLE, css = '', lang = 'ar', name = 'dayflow-planner.pdf', orient = 'portrait'
   if (!selftest) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}
     if (typeof body.html !== 'string' || typeof body.css !== 'string') return res.status(400).json({ error: 'bad input' })
@@ -50,11 +50,12 @@ export default async function handler(req: any, res: any) {
     html = body.html.replace(/<script[\s\S]*?<\/script>/gi, '')
     css = body.css.replace(/@import[^;]*;/gi, '').replace(/url\(\s*(['"]?)(?!data:)[^)]*\)/gi, 'none')
     lang = body.lang === 'en' ? 'en' : 'ar'
+    orient = body.orientation === 'landscape' ? 'landscape' : 'portrait'
     if (typeof body.name === 'string' && /^[\w.-]{1,80}\.pdf$/.test(body.name)) name = body.name
   }
   const doc = `<!doctype html><html lang="${lang}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><style>
 ${fonts()}
-@page{size:A4 portrait;margin:0}
+@page{size:A4 ${orient};margin:0}
 html,body{margin:0;padding:0;background:#fff}
 *{box-sizing:border-box}
 ${css}
@@ -75,7 +76,7 @@ ${css}
       else r.abort()
     })
     await page.setContent(doc, { waitUntil: 'load', timeout: 20000 })
-    const pdf = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } })
+    const pdf = await page.pdf({ format: 'A4', landscape: orient === 'landscape', printBackground: true, preferCSSPageSize: true, margin: { top: 0, right: 0, bottom: 0, left: 0 } })
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${name}"`)
     res.setHeader('Cache-Control', 'no-store')
