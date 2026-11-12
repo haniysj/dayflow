@@ -18,7 +18,7 @@ import { FileIcon, Modal, PrintIcon, Seg, Switch } from './ui'
 const PAGE_W = 210, PAGE_H = 297 // mm, A4 portrait
 const MM = 96 / 25.4 // px per mm
 
-interface Opts { month: string; startWeek: string; weeks: number; labelSide: 'left' | 'right'; withItems: boolean; withHijri: boolean }
+interface Opts { span: 'month' | 'year'; year: number; cover: boolean; month: string; startWeek: string; weeks: number; labelSide: 'left' | 'right'; withItems: boolean; withHijri: boolean }
 
 /** Sundays whose Sun–Thu span touches the given month */
 function weeksOfMonth(month: string) {
@@ -31,26 +31,45 @@ function weeksOfMonth(month: string) {
   return out
 }
 
+/** Sundays whose Sun–Thu span touches the given year (52 or 53 weeks) */
+export function weeksOfYear(year: number) {
+  const first = `${year}-01-01`, last = `${year}-12-31`
+  const out: string[] = []
+  for (let s = startOfWeek(first, 0); s <= last; s = addDays(s, 7)) if (addDays(s, 4) >= first) out.push(s)
+  return out
+}
+
 export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; initialMonth?: string }) {
   const today = todayStr()
   const [opts, setOpts] = useState<Opts>(() => {
     const m = startOfMonth(initialMonth || today)
-    return { month: m, startWeek: weeksOfMonth(m)[0], weeks: 4, labelSide: 'right', withItems: true, withHijri: true }
+    const y = +today.slice(0, 4) + (+today.slice(5, 7) >= 10 ? 1 : 0) // from October on, default to planning next year
+    return { span: 'month', year: y, cover: true, month: m, startWeek: weeksOfMonth(m)[0], weeks: 4, labelSide: 'right', withItems: true, withHijri: true }
   })
   const up = (c: Partial<Opts>) => setOpts(o => ({ ...o, ...c }))
   const monthOptions = useMemo(() => Array.from({ length: 15 }, (_, i) => addMonths(startOfMonth(today), i - 2)), [today])
   const weekOptions = weeksOfMonth(opts.month)
-  const sundays = Array.from({ length: opts.weeks }, (_, i) => addDays(opts.startWeek, 7 * i))
+  const isYear = opts.span === 'year'
+  const sundays = isYear ? weeksOfYear(opts.year) : Array.from({ length: opts.weeks }, (_, i) => addDays(opts.startWeek, 7 * i))
+  const withCover = isYear && opts.cover
+  const pageCount = sundays.length + (withCover ? 1 : 0)
+  const y0 = +today.slice(0, 4)
   const [busy, setBusy] = useState<'' | 'pdf' | 'print'>('')
   const printRoot = useRef<HTMLDivElement>(null)
 
   const setMonth = (m: string) => up({ month: m, startWeek: weeksOfMonth(m)[0] })
 
-  const fileName = `dayflow-planner-${opts.startWeek}.pdf`
+  const fileName = isYear ? `dayflow-planner-${opts.year}.pdf` : `dayflow-planner-${opts.startWeek}.pdf`
   const doPrint = () => { setBusy('print'); printPages('portrait', () => setBusy('')) }
   const doPdf = async () => { setBusy('pdf'); await savePdf(printRoot.current, fileName, 'portrait'); setBusy('') }
 
-  const previewScale = Math.min(0.42, (Math.min(window.innerWidth, 560) - 70) / (PAGE_W * MM))
+  const previews = withCover ? 2 : 1
+  const previewScale = Math.min(0.42, (Math.min(window.innerWidth, 560) - 70 - (previews - 1) * 12) / previews / (PAGE_W * MM))
+  const pageBox = (child: React.ReactNode, label: string) => (
+    <div dir="ltr" style={{ position: 'relative', width: PAGE_W * MM * previewScale, height: PAGE_H * MM * previewScale, overflow: 'hidden', boxShadow: '0 4px 16px rgba(16,42,67,.18)', borderRadius: 3, background: '#fff', flexShrink: 0 }} aria-label={label}>
+      <div style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${previewScale})`, transformOrigin: 'top left', width: PAGE_W * MM }}>{child}</div>
+    </div>
+  )
 
   return (
     <>
@@ -59,8 +78,26 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
           <button className="btn primary" disabled={!!busy} onClick={doPrint}><PrintIcon size={17} />{L('طباعة', 'Print')}</button>
           <button className="btn" disabled={!!busy} onClick={doPdf}><FileIcon kind="pdf" size={18} />{busy === 'pdf' ? L('جارٍ إنشاء الملف…', 'Creating…') : L('حفظ PDF', 'Save PDF')}</button>
           <span className="grow" />
-          <span className="tiny muted">A4 · {opts.weeks} {L('صفحات', 'pages')}</span>
+          <span className="tiny muted">A4 · {pageCount} {pageCount > 10 ? L('صفحة', 'pages') : L('صفحات', 'pages')}</span>
         </>}>
+        <div className="row wrap" style={{ gap: 14 }}>
+          <div className="field"><span>{L('المدة', 'Range')}</span>
+            <Seg label={L('المدة', 'Range')} value={opts.span} onChange={v => up({ span: v })} options={[{ v: 'month', l: L('أسابيع من شهر', 'Weeks of a month') }, { v: 'year', l: L('سنة كاملة', 'Full year') }]} />
+          </div>
+          <div className="field"><span>{L('موضع اليوم والتاريخ', 'Day & date position')}</span>
+            <Seg label={L('موضع اليوم', 'Day position')} value={opts.labelSide} onChange={v => up({ labelSide: v })} options={[{ v: 'right', l: L('يمين', 'Right') }, { v: 'left', l: L('يسار', 'Left') }]} />
+          </div>
+        </div>
+        {isYear ? (
+          <div className="grid g2">
+            <label className="field"><span>{L('السنة', 'Year')}</span>
+              <select className="input" value={opts.year} onChange={e => up({ year: +e.target.value })}>
+                {[y0 - 1, y0, y0 + 1, y0 + 2].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </label>
+            <label className="row small" style={{ alignSelf: 'end', paddingBottom: 8 }}><Switch label="cover" checked={opts.cover} onChange={v => up({ cover: v })} /><b>{L('صفحة غلاف في البداية', 'Cover page first')}</b></label>
+          </div>
+        ) : (<>
         <div className="grid g2">
           <label className="field"><span>{L('الشهر', 'Month')}</span>
             <select className="input" value={opts.month} onChange={e => setMonth(e.target.value)}>
@@ -73,29 +110,24 @@ export function PlannerDialog({ onClose, initialMonth }: { onClose: () => void; 
             </select>
           </label>
         </div>
-        <div className="row wrap" style={{ gap: 14 }}>
           <div className="field"><span>{L('عدد الأسابيع', 'Weeks')}</span>
             <Seg label={L('عدد الأسابيع', 'Weeks')} value={opts.weeks} onChange={v => up({ weeks: v })} options={[1, 2, 3, 4, 5].map(v => ({ v, l: String(v) }))} />
           </div>
-          <div className="field"><span>{L('موضع اليوم والتاريخ', 'Day & date position')}</span>
-            <Seg label={L('موضع اليوم', 'Day position')} value={opts.labelSide} onChange={v => up({ labelSide: v })} options={[{ v: 'right', l: L('يمين', 'Right') }, { v: 'left', l: L('يسار', 'Left') }]} />
-          </div>
-        </div>
+        </>)}
         <div className="row wrap" style={{ gap: 18 }}>
           <label className="row small"><Switch label="items" checked={opts.withItems} onChange={v => up({ withItems: v })} /><b>{L('إدراج مواعيدي ومهامي المسجلة', 'Include my events & tasks')}</b></label>
           <label className="row small"><Switch label="hijri" checked={opts.withHijri} onChange={v => up({ withHijri: v })} /><b>{L('التاريخ الهجري', 'Hijri date')}</b></label>
         </div>
-        <div className="small muted">{L('الصفحات', 'Pages')}: {sundays.map(s => `${fmtShort(s)}–${fmtShort(addDays(s, 4))}`).join(' · ')}</div>
-        <div style={{ display: 'flex', justifyContent: 'center', background: 'var(--soft)', borderRadius: 14, padding: 12 }}>
-          <div dir="ltr" style={{ position: 'relative', width: PAGE_W * MM * previewScale, height: PAGE_H * MM * previewScale, overflow: 'hidden', boxShadow: '0 4px 16px rgba(16,42,67,.18)', borderRadius: 3, background: '#fff' }} aria-label={L('معاينة الصفحة الأولى', 'Preview of first page')}>
-            <div style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${previewScale})`, transformOrigin: 'top left', width: PAGE_W * MM }}>
-              <PlannerPages sundays={sundays.slice(0, 1)} opts={opts} />
-            </div>
-          </div>
+        <div className="small muted">{L('الصفحات', 'Pages')}: {isYear
+          ? <>{withCover && L('غلاف + ', 'cover + ')}{sundays.length} {L('أسبوعاً', 'weeks')} ({fmtShort(sundays[0])} {sundays[0].slice(0, 4)} – {fmtShort(addDays(sundays[sundays.length - 1], 4))} {addDays(sundays[sundays.length - 1], 4).slice(0, 4)})</>
+          : sundays.map(s => `${fmtShort(s)}–${fmtShort(addDays(s, 4))}`).join(' · ')}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, background: 'var(--soft)', borderRadius: 14, padding: 12 }}>
+          {withCover && pageBox(<YearCover year={opts.year} withHijri={opts.withHijri} />, L('معاينة الغلاف', 'Cover preview'))}
+          {pageBox(<PlannerPages sundays={sundays.slice(0, 1)} opts={opts} />, L('معاينة الصفحة الأولى', 'Preview of first page'))}
         </div>
         <p className="tiny muted" style={{ margin: 0 }}>{L('على الآيباد أو الجوال: «حفظ PDF» ينشئ الملف مباشرة. «طباعة» يفتح نافذة الطباعة، ومنها يمكن أيضاً اختيار «حفظ كـ PDF».', 'On iPad/phone, “Save PDF” creates the file directly. “Print” opens the print dialog, where you can also choose “Save as PDF”.')}</p>
       </Modal>
-      {createPortal(<div id="pl-print-root" ref={printRoot}><PlannerPages sundays={sundays} opts={opts} /></div>, document.body)}
+      {createPortal(<div id="pl-print-root" ref={printRoot}>{withCover && <YearCover year={opts.year} withHijri={opts.withHijri} />}<PlannerPages sundays={sundays} opts={opts} /></div>, document.body)}
     </>
   )
 }
@@ -186,11 +218,11 @@ function PlannerPages({ sundays, opts }: { sundays: string[]; opts: Opts }) {
   )
 }
 
-function MiniMonth({ month, weekStart, rtl, holidays }: { month: string; weekStart: string; rtl: boolean; holidays: Set<string> }) {
+function MiniMonth({ month, weekStart, rtl, holidays }: { month: string; weekStart?: string; rtl: boolean; holidays: Set<string> }) {
   const first = startOfWeek(startOfMonth(month), 0)
   const last = addDays(startOfWeek(endOfMonth(month), 0), 6)
   const days = range(first, last)
-  const weekEnd = addDays(weekStart, 4)
+  const weekEnd = weekStart ? addDays(weekStart, 4) : ''
   return (
     <div className="pl-cal" dir={rtl ? 'rtl' : 'ltr'}>
       <div className="pl-cal-t">{fmtMonth(month)}</div>
@@ -198,12 +230,50 @@ function MiniMonth({ month, weekStart, rtl, holidays }: { month: string; weekSta
         {days.slice(0, 7).map(d => <div key={'h' + d} className="pl-cal-h">{weekdayName(d, 'narrow')}</div>)}
         {days.map(d => {
           const out = d.slice(0, 7) !== month.slice(0, 7)
-          const inWeek = d >= weekStart && d <= weekEnd
+          const inWeek = !!weekStart && d >= weekStart && d <= weekEnd
           const we = dow(d) === 5 || dow(d) === 6
           return <div key={d} className={`pl-cal-d${out ? ' out' : ''}${inWeek ? ' wk' : ''}${we ? ' we' : ''}${holidays.has(d) && !out ? ' hol' : ''}`}>{+d.slice(8)}</div>
         })}
       </div>
     </div>
+  )
+}
+
+const hijriYear = (d: string) => {
+  try {
+    return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-SA-u-ca-islamic-umalqura-nu-latn' : 'en-u-ca-islamic-umalqura', { timeZone: 'UTC', year: 'numeric' }).format(new Date(d + 'T12:00:00Z'))
+  } catch { return '' }
+}
+
+/** Cover page for the full-year planner */
+function YearCover({ year, withHijri }: { year: number; withHijri: boolean }) {
+  const { settings } = useApp()
+  const holidays = useHolidays() || []
+  const rtl = getLang() === 'ar'
+  const off = new Set(holidays.flatMap(h => (h.official ? range(h.start, h.end) : [])))
+  const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}-01`)
+  const hy = withHijri ? [hijriYear(`${year}-01-01`), hijriYear(`${year}-12-31`)] : []
+  return (
+    <section className="pl-page pl-cover" dir={rtl ? 'rtl' : 'ltr'}>
+      <div className="pl-cv-band">
+        <div className="pl-cv-app">{settings.appName}</div>
+        <div className="pl-cv-title">{L('المخطط السنوي', 'Annual Planner')}</div>
+        <div className="pl-cv-year"><span className="pl-cv-for">{L('لعام', 'for')}</span><span className="pl-cv-num">{year}</span></div>
+        {withHijri && <div className="pl-cv-hijri">{hy[0] === hy[1] ? hy[0] : `${hy[0]} – ${hy[1]}`}</div>}
+        <div className="pl-cv-rule" />
+      </div>
+      <div className="pl-cv-body">
+        <div className="pl-cv-goals">
+          <div className="pl-label">{L(`أهدافي لعام ${year}`, `My goals for ${year}`)}</div>
+          {[1, 2, 3, 4, 5].map(n => <div key={n} className="pl-prio-line"><span>{n}</span></div>)}
+        </div>
+        <div className="pl-label">{L('السنة في لمحة', 'The year at a glance')}</div>
+        <div className="pl-cv-months" dir={rtl ? 'rtl' : 'ltr'}>
+          {months.map(m => <MiniMonth key={m} month={m} rtl={rtl} holidays={off} />)}
+        </div>
+        <div className="pl-foot"><span>{settings.appName} · {L('العطل الرسمية باللون الأخضر', 'Public holidays in green')}</span><span>Prepared by: Hani Al Ghatrifi</span></div>
+      </div>
+    </section>
   )
 }
 

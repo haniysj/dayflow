@@ -389,7 +389,7 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 .pl-hijri { font-size: 6.5pt; color: #627D98; margin-top: 0.8mm; line-height: 1.3; }
 .pl-write { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 0.5mm 3mm 0; }
 .pl-write.off { background: #F3FAF5; }
-.pl-line { flex: 1; border-bottom: 0.2mm dashed #D9E2EC; display: flex; align-items: flex-end; gap: 1.5mm; padding-bottom: 0.4mm; font-size: 8.5pt; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.pl-line { flex: 1; border-bottom: 0.2mm solid #E4EBF2; display: flex; align-items: flex-end; gap: 1.5mm; padding-bottom: 0.4mm; font-size: 8.5pt; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .pl-line:last-child { border-bottom: 0; }
 .pl-time { font-weight: 800; color: #1F7A6D; margin: 0 1.5mm; unicode-bidi: isolate; white-space: nowrap; }
 .pl-tag { border: 0.25mm solid; border-radius: 5mm; padding: 0 2mm; font-size: 7.5pt; font-weight: 800; }
@@ -398,6 +398,28 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 .pl-box.on { background: #1F7A6D; border-color: #1F7A6D; }
 .pl-more { color: #627D98; font-size: 7.5pt; font-weight: 700; }
 .pl-foot { display: flex; justify-content: space-between; font-size: 7pt; color: #829AB1; flex-shrink: 0; }
+
+/* ----- full-year planner cover ----- */
+.pl-page.pl-cover { padding: 0; gap: 0; }
+.pl-cv-band {
+  height: 92mm; flex-shrink: 0; padding: 12mm 15mm 0; color: #fff; display: flex; flex-direction: column; justify-content: flex-end;
+  background-color: #102A43;
+  background-image: radial-gradient(circle at 12% 18%, rgba(31,122,109,.55) 0, rgba(31,122,109,.55) 26mm, transparent 26.2mm),
+    radial-gradient(circle at 26% 2%, rgba(240,180,41,.22) 0, rgba(240,180,41,.22) 16mm, transparent 16.2mm),
+    radial-gradient(circle at 4% 72%, rgba(255,255,255,.06) 0, rgba(255,255,255,.06) 20mm, transparent 20.2mm);
+}
+.pl-cv-app { font-size: 10pt; font-weight: 800; letter-spacing: 0.6mm; color: #9FB3C8; }
+.pl-cv-title { font-size: 30pt; font-weight: 800; line-height: 1.25; margin-top: 1mm; }
+.pl-cv-year { display: flex; align-items: baseline; gap: 4mm; line-height: 1; }
+.pl-cv-for { font-size: 22pt; font-weight: 700; color: #D9E2EC; }
+.pl-cv-num { font-size: 64pt; font-weight: 800; color: #F0B429; letter-spacing: 0.5mm; }
+.pl-cv-hijri { font-size: 12pt; font-weight: 700; color: #BCCCDC; margin-top: 2mm; }
+.pl-cv-rule { height: 2mm; width: 42mm; background: #F0B429; border-radius: 1mm; margin: 5mm 0 8mm; }
+.pl-cv-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2.5mm; padding: 7mm 12mm 6mm; }
+.pl-cv-goals { height: 37mm; flex-shrink: 0; border: 0.35mm solid #D9E2EC; border-radius: 3mm; padding: 2mm 4mm; display: flex; flex-direction: column; margin-bottom: 2mm; }
+.pl-cv-months { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3mm; }
+.pl-cv-months .pl-cal { width: auto; padding: 1.5mm 2mm; overflow: hidden; }
+.pl-cv-months .pl-cal-g { font-size: 7pt; line-height: 4mm; }
 
 /* ===================== Year / multi-month calendar sheet ===================== */
 .pl-page.pl-land { width: 297mm; height: 210mm; }
