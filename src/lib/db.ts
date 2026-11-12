@@ -14,6 +14,8 @@ export class DayFlowDB extends Dexie {
   leaves!: Table<Leave, string>
   holidays!: Table<Holiday, string>
   meta!: Table<MetaRecord, string>
+  /** device-only bookkeeping (sync cursor), never synced or exported */
+  local!: Table<{ id: string; v: any }, string>
 
   constructor() {
     super('dayflow')
@@ -29,6 +31,9 @@ export class DayFlowDB extends Dexie {
       holidays: 'id, start, end, dirty, deleted',
       meta: 'id, dirty, deleted',
     })
+    // v2: the sync cursor lives next to the data it describes, so if the browser clears the
+    // local database the cursor goes with it and the next sync downloads everything again
+    this.version(2).stores({ local: 'id' })
   }
 }
 

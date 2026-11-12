@@ -341,8 +341,8 @@ function Data() {
       try { await wipeRemote(p) } catch (e) { return toast(errCode(e) === 'DF_BADPASS' ? L('كلمة المرور خاطئة', 'Wrong password') : errCode(e), { err: true }) }
       await logout()
     }
-    await Promise.all(TABLES.map(t => (db as any)[t].clear()))
-    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded') localStorage.removeItem(k)
+    await Promise.all([...TABLES.map(t => (db as any)[t].clear()), db.local.clear()])
+    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded' && k !== 'df-ev-defaults') localStorage.removeItem(k)
     toast(L('حُذفت كل البيانات', 'All data deleted'))
     setTimeout(() => location.reload(), 900)
   }

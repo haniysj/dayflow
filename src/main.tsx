@@ -19,7 +19,7 @@ async function boot() {
     const firstRun = !localStorage.getItem('df-seeded')
     await runMigrations()
     await firstRunSeed()
-    if (firstRun) localStorage.setItem('df-pristine', '1')
+    if (firstRun) { localStorage.setItem('df-pristine', '1'); localStorage.setItem('df-ev-defaults', '1') }
     await mergeOfficialHolidays()
     const s = await getSettings()
     setLang(s.lang)

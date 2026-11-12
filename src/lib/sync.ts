@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { addDefaultEventReminders } from './migrate'
 import { db, onLocalChange, TABLES } from './db'
 import type { TableName } from './types'
 
@@ -33,7 +34,8 @@ export const getSyncInfo = () => info
 
 export const getToken = () => localStorage.getItem('df-token')
 const setToken = (t: string | null) => (t ? localStorage.setItem('df-token', t) : localStorage.removeItem('df-token'))
-const cursor = () => Number(localStorage.getItem('df-cursor') || 0)
+const cursor = async () => Number((await db.local.get('cursor'))?.v || 0)
+const setCursor = (n: number) => db.local.put({ id: 'cursor', v: n })
 
 const deviceName = () => {
   const ua = navigator.userAgent
@@ -56,13 +58,13 @@ async function rpc<T = any>(fn: string, args: Record<string, any>): Promise<T> {
 }
 
 export async function serverStatus(): Promise<{ has_password: boolean }> { return rpc('df_status', {}) }
-export async function setupPassword(pass: string) { setToken(await rpc<string>('df_setup', { p_pass: pass, p_device: deviceName() })); localStorage.setItem('df-cursor', '0') }
-export async function login(pass: string) { setToken(await rpc<string>('df_login', { p_pass: pass, p_device: deviceName() })); localStorage.setItem('df-cursor', '0') }
+export async function setupPassword(pass: string) { setToken(await rpc<string>('df_setup', { p_pass: pass, p_device: deviceName() })); await setCursor(0) }
+export async function login(pass: string) { setToken(await rpc<string>('df_login', { p_pass: pass, p_device: deviceName() })); await setCursor(0) }
 export async function logout() {
   const t = getToken()
   try { if (t) await rpc('df_logout', { p_token: t }) } catch { /* offline: token stays revoked on server only when reachable */ }
   setToken(null)
-  localStorage.removeItem('df-cursor')
+  await setCursor(0)
   set({ state: 'local' })
 }
 export async function changePassword(oldP: string, newP: string) { await rpc('df_change_pass', { p_token: getToken(), p_old: oldP, p_new: newP }) }
@@ -76,7 +78,15 @@ export async function serverHasData() {
 /** Clear local data so a fresh device mirrors the cloud exactly */
 export async function resetLocal() {
   await Promise.all(TABLES.map(t => (db as any)[t].clear()))
-  localStorage.setItem('df-cursor', '0')
+  await setCursor(0)
+}
+
+/** After re-downloading everything, apply the one-off data updates that ran while the local copy was empty */
+async function afterFullPull() {
+  localStorage.removeItem('df-cursor') // old location of the cursor
+  if (localStorage.getItem('df-ev-defaults')) return
+  localStorage.setItem('df-ev-defaults', '1')
+  await addDefaultEventReminders()
 }
 
 let running: Promise<void> | null = null
@@ -116,7 +126,8 @@ async function doSync() {
       }
     }
     // 2) pull
-    let cur = cursor()
+    let cur = await cursor()
+    const fullPull = cur === 0
     for (let guard = 0; guard < 50; guard++) {
       const res = await rpc<any>('df_pull', { p_token: token, p_cursor: cur })
       const byTable: Record<string, any[]> = {}
@@ -133,9 +144,10 @@ async function doSync() {
         })
       }
       cur = res.cursor
-      localStorage.setItem('df-cursor', String(cur))
+      await setCursor(cur)
       if (!res.more) break
     }
+    if (fullPull) await afterFullPull()
     const now = Date.now()
     localStorage.setItem('df-last-sync', String(now))
     set({ state: 'synced', lastSync: now, error: undefined, pending: 0 })
