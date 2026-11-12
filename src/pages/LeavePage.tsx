@@ -4,9 +4,11 @@ import { useApp } from '../app-context'
 import { confirmDialog, DateBadge, Empty, FileIcon, Modal, Seg, Switch, toast } from '../components/ui'
 import { addDays, diffDays, fmtMed, fmtShort, fmtNumeric, relDay, todayStr, hijri } from '../lib/dates'
 import { remove, save, uid, useHolidays, useLeaves } from '../lib/db'
-import { L, LEAVE_TYPE_LABEL } from '../lib/i18n'
+import { L } from '../lib/i18n'
+import { leaveTypeName, leaveTypes, typeCountsWeekends } from '../lib/leaveTypes'
+import { daysLabel, RangePicker } from '../components/RangePicker'
 import { exportHolidays, importHolidays } from '../lib/io'
-import { countLeaveDays, leaveYearRange, newTask } from '../lib/logic'
+import { countLeaveDays, holidayDates, leaveYearRange, newTask } from '../lib/logic'
 import { scheduleSoon } from '../lib/notify'
 import type { Holiday, Leave, LeaveType } from '../lib/types'
 
@@ -36,7 +38,7 @@ export function LeavePage() {
           <div className="kpi"><b style={{ color: remaining != null && remaining < 0 ? 'var(--rose)' : 'var(--teal)' }}>{remaining ?? '—'}</b><span>{L('المتبقي', 'Remaining')}</span></div>
         </div>
         {allowance != null && <div className="hbar" style={{ marginTop: 12 }}><div style={{ width: `${Math.min(100, ((used + booked) / Math.max(1, allowance)) * 100)}%` }} /></div>}
-        <p className="tiny muted" style={{ margin: '8px 0 0' }}>{L(`الإجازة الاعتيادية تُحتسب فيها أيام عطلة نهاية الأسبوع التي تقع ضمن فترتها، و${settings.leaveCountHolidays ? 'تُحتسب' : 'لا تُحتسب'} العطل الرسمية (من الإعدادات).`, `Annual leave counts the weekend days it covers; public holidays ${settings.leaveCountHolidays ? 'count' : 'do not count'} (see Settings).`)}</p>
+        <p className="tiny muted" style={{ margin: '8px 0 0' }}>{settings.leaveCountHolidays ? L('تُحتسب كل أيام الإجازة من يوم البداية إلى يوم النهاية، بما فيها عطلة نهاية الأسبوع والعطل الرسمية.', 'Every day from the first to the last day counts, including weekends and public holidays.') : L('لا تُحتسب العطل الرسمية الواقعة ضمن الإجازة (من الإعدادات).', 'Public holidays inside a leave do not count (see Settings).')}</p>
       </section>
 
       <section className="card">
@@ -49,10 +51,10 @@ export function LeavePage() {
             <div key={l.id} className="list-item" style={{ opacity: l.end < today ? 0.7 : 1 }}>
               <DateBadge date={l.start} sm cream />
               <div className="grow">
-                <b>{(LEAVE_TYPE_LABEL() as any)[l.type]}</b>
+                <b>{leaveTypeName(settings, l.type)}</b>
                 <div className="row wrap" style={{ gap: 5 }}>
                   <span className="small iso nowrap">{fmtShort(l.start)} – {fmtShort(l.end)}</span>
-                  <span className="pill">{l.workingDays} {l.workingDays > 10 ? L('يوماً', 'days') : L('أيام', 'days')}</span>
+                  <span className="pill">{daysLabel(l.workingDays)}</span>
                   <span className={`pill${l.start <= today && l.end >= today ? ' teal' : ''}`}>{status}</span>
                   {l.demo && <span className="pill outline">{L('تجريبي', 'Demo')}</span>}
                 </div>
@@ -102,14 +104,25 @@ function LeaveEditor({ leave, holidays, onClose }: { leave: Leave; holidays: Hol
       {!isNew && <button className="btn ghost icon sm danger" onClick={del} aria-label={L('حذف', 'Delete')}><Trash2 size={16} /></button>}
     </>}>
       <label className="field"><span>{L('نوع الإجازة', 'Leave type')}</span>
-        <select className="input" value={l.type} onChange={e => setL({ ...l, type: e.target.value as LeaveType })}>{Object.entries(LEAVE_TYPE_LABEL()).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <select className="input" value={l.type} onChange={e => setL({ ...l, type: e.target.value as LeaveType })}>
+          {leaveTypes(settings).filter(t => !t.hidden || t.id === l.type).map(t => <option key={t.id} value={t.id}>{leaveTypeName(settings, t.id)}</option>)}
+        </select>
       </label>
+      <div className="field"><span>{L('فترة الإجازة', 'Leave period')}</span>
+        <RangePicker start={l.start} end={l.end} onChange={(a, b) => setL({ ...l, start: a, end: b })} holidays={holidayDates(holidays)} workdays={settings.workdays} />
+      </div>
       <div className="grid g2">
-        <label className="field"><span>{L('من', 'From')}</span><input className="input" type="date" value={l.start} onChange={e => setL({ ...l, start: e.target.value, end: l.end < e.target.value ? e.target.value : l.end })} /></label>
-        <label className="field"><span>{L('إلى', 'To')}</span><input className="input" type="date" value={l.end} min={l.start} onChange={e => setL({ ...l, end: e.target.value })} /></label>
+        <label className="field"><span>{L('من', 'From')}</span><input className="input" type="date" value={l.start} onChange={e => e.target.value && setL({ ...l, start: e.target.value, end: l.end < e.target.value ? e.target.value : l.end })} /></label>
+        <label className="field"><span>{L('إلى', 'To')}</span><input className="input" type="date" value={l.end} min={l.start} onChange={e => e.target.value && setL({ ...l, end: e.target.value < l.start ? l.start : e.target.value })} /></label>
+      </div>
+      <div className="leave-count">
+        <div><b>{daysLabel(diffDays(l.end, l.start) + 1)}</b><span>{L('الأيام المختارة', 'Days selected')}</span></div>
+        <div className="hl"><b>{daysLabel(days)}</b><span>{L('تُحتسب من الإجازة', 'Counted as leave')}</span></div>
       </div>
       <div className="banner info" style={{ alignItems: 'center' }}>
-        <div className="grow"><b>{days}</b> {days > 10 ? L('يوماً', 'days') : L('أيام', 'days')} {l.type === 'annual' ? <span className="tiny muted">{L('(تشمل عطلة نهاية الأسبوع داخل الفترة)', '(includes weekends inside the period)')}</span> : null} <span className="tiny muted">({L('تلقائي:', 'auto:')} {auto})</span></div>
+        <div className="grow small">{typeCountsWeekends(settings, l.type) && settings.leaveCountHolidays
+          ? L('تُحتسب كل الأيام من يوم البداية إلى يوم النهاية، بما فيها عطلة نهاية الأسبوع والعطل الرسمية', 'Every day from the first to the last counts, weekends and public holidays included')
+          : <>{typeCountsWeekends(settings, l.type) ? L('تُحتسب عطلة نهاية الأسبوع الواقعة ضمن الفترة', 'Weekend days inside the period count') : L('لا تُحتسب عطلة نهاية الأسبوع', 'Weekends do not count')}{!settings.leaveCountHolidays && <>{L('، ولا تُحتسب العطل الرسمية', '; public holidays do not count')}</>}</>}. <span className="tiny muted">({L('تلقائي:', 'auto:')} {auto})</span></div>
         <label className="check small"><input type="checkbox" checked={manual} onChange={e => { setManual(e.target.checked); setL({ ...l, workingDays: auto }) }} />{L('تعديل يدوي', 'Override')}</label>
         {manual && <input className="input" type="number" min={0} style={{ width: 80 }} value={l.workingDays} onChange={e => setL({ ...l, workingDays: Math.max(0, +e.target.value) })} aria-label={L('عدد الأيام', 'Days')} />}
       </div>

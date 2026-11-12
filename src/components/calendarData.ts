@@ -1,6 +1,7 @@
 import { addDays, fmtTime, range } from '../lib/dates'
 import { db, save, uid } from '../lib/db'
-import { getLang, L, LEAVE_TYPE_LABEL } from '../lib/i18n'
+import { getLang, L } from '../lib/i18n'
+import { leaveTypeName } from '../lib/leaveTypes'
 import { expandEvents, isOpen, type EventInstance } from '../lib/logic'
 import { scheduleSoon } from '../lib/notify'
 import type { CalEvent, Category, Holiday, Leave, Settings, Task } from '../lib/types'
@@ -38,7 +39,7 @@ export function buildCalendar(opts: {
   }
   for (const l of opts.leaves) {
     if (l.end < from || l.start > to || !match(filter, 'leave', 'leave')) continue
-    const base = { title: (LEAVE_TYPE_LABEL() as any)[l.type], color: tc('leave'), onClick: () => opts.onLeave?.(l) }
+    const base = { title: leaveTypeName(settings, l.type), color: tc('leave'), onClick: () => opts.onLeave?.(l) }
     spans.push({ ...base, key: `l-${l.id}`, start: l.start, end: l.end, rank: 0 })
     for (const d of range(l.start > from ? l.start : from, l.end < to ? l.end : to)) day(d).push({ ...base, key: `l-${l.id}-${d}` })
   }

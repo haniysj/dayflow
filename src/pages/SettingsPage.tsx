@@ -1,13 +1,14 @@
 import { BUILD, checkForUpdate } from '../lib/appUpdate'
+import { BUILTIN_LEAVE, leaveTypeName, leaveTypes } from '../lib/leaveTypes'
 import {
   Bell, BellRing, Cloud, Database, Download, Globe, KeyRound, LogOut, Palette, Palmtree, RefreshCw, Smartphone, Trash2, Upload, FolderKanban,
-  ShieldCheck, Info, Send,
+  ShieldCheck, Info, Send, ArrowUp, ArrowDown, Eye, EyeOff, Plus,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useApp } from '../app-context'
 import { EVENT_TYPES, typeColor } from '../components/EventEditor'
 import { confirmDialog, FileIcon, Seg, Switch, toast } from '../components/ui'
-import { TABLES, db, updateSettings } from '../lib/db'
+import { TABLES, db, uid, updateSettings } from '../lib/db'
 import { addDays, fmtLong, todayStr } from '../lib/dates'
 import { EVENT_TYPE_LABEL, L, REMINDER_OPTIONS } from '../lib/i18n'
 import { exportICS, exportJSON, exportTasksCSV, importJSON } from '../lib/io'
@@ -20,7 +21,7 @@ import {
 } from '../lib/sync'
 import { SyncConnectForm } from '../components/SyncConnect'
 import { ReminderPicker } from '../components/ReminderPicker'
-import type { Settings } from '../lib/types'
+import type { LeaveTypeDef, Settings } from '../lib/types'
 
 type Tab = 'general' | 'appearance' | 'notify' | 'sync' | 'calendar' | 'data'
 
@@ -290,6 +291,44 @@ function ChangePass() {
   )
 }
 
+function LeaveTypesCard({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void }) {
+  const list = leaveTypes(s)
+  const put = (next: LeaveTypeDef[]) => set({ leaveTypes: next })
+  const upd = (id: string, c: Partial<LeaveTypeDef>) => put(list.map(t => (t.id === id ? { ...t, ...c } : t)))
+  const move = (i: number, d: number) => { const a = [...list]; const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; put(a) }
+  const add = () => put([...list, { id: 'c-' + uid().slice(0, 8), name: L('نوع جديد', 'New type'), countWeekends: false }])
+  const del = async (t: LeaveTypeDef) => {
+    const used = await db.leaves.filter(l => !l.deleted && l.type === t.id).count()
+    if (used) return toast(L(`هذا النوع مستخدم في ${used} إجازة — يمكنك إخفاؤه بدلاً من حذفه`, `Used by ${used} leave record(s) — hide it instead`), { err: true })
+    put(list.filter(x => x.id !== t.id))
+  }
+  return (
+    <Card title={L('أنواع الإجازات', 'Leave types')} icon={<Palmtree size={18} />}>
+      <p className="tiny muted" style={{ marginTop: 0 }}>{L('عدّل الأسماء التي تظهر عند تسجيل إجازة، وحدد لكل نوع هل تُحتسب فيه عطلة نهاية الأسبوع. الإجازة الاعتيادية هي التي تُخصم من الرصيد.', 'Rename the types shown when recording leave, and choose whether each counts weekends. Annual leave is the one deducted from the balance.')}</p>
+      {list.map((t, i) => {
+        const builtin = BUILTIN_LEAVE.includes(t.id)
+        return (
+          <div key={t.id} className={`lt-row${t.hidden ? ' off' : ''}`}>
+            <input className="input" defaultValue={t.name || ''} placeholder={leaveTypeName({ ...s, leaveTypes: undefined }, t.id)} aria-label={L('اسم النوع', 'Type name')}
+              onBlur={e => { const v = e.target.value.trim(); if (v !== (t.name || '')) upd(t.id, { name: v || undefined }) }} />
+            <label className="lt-w"><Switch label={L('احتساب عطلة نهاية الأسبوع', 'Count weekends')} checked={t.countWeekends} onChange={v => upd(t.id, { countWeekends: v })} />{L('الويكند', 'Weekends')}</label>
+            <div className="row" style={{ gap: 2 }}>
+              <button className="btn ghost icon sm" onClick={() => move(i, -1)} disabled={!i} aria-label={L('أعلى', 'Up')}><ArrowUp size={15} /></button>
+              <button className="btn ghost icon sm" onClick={() => move(i, 1)} disabled={i === list.length - 1} aria-label={L('أسفل', 'Down')}><ArrowDown size={15} /></button>
+              {t.id !== 'annual' && <button className="btn ghost icon sm" onClick={() => upd(t.id, { hidden: !t.hidden })} aria-label={t.hidden ? L('إظهار', 'Show') : L('إخفاء', 'Hide')} title={t.hidden ? L('مخفي — اضغط للإظهار', 'Hidden — tap to show') : L('إخفاء من القائمة', 'Hide from the list')}>{t.hidden ? <EyeOff size={15} /> : <Eye size={15} />}</button>}
+              {!builtin && <button className="btn ghost icon sm danger" onClick={() => del(t)} aria-label={L('حذف', 'Delete')}><Trash2 size={15} /></button>}
+            </div>
+          </div>
+        )
+      })}
+      <div className="row" style={{ marginTop: 10, gap: 8 }}>
+        <button className="btn sm" onClick={add}><Plus size={15} />{L('نوع إجازة جديد', 'New leave type')}</button>
+        {s.leaveTypes?.length ? <button className="btn sm ghost" onClick={() => set({ leaveTypes: undefined })}>{L('استعادة الافتراضي', 'Reset to default')}</button> : null}
+      </div>
+    </Card>
+  )
+}
+
 function CalLeave({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void }) {
   const { go } = useApp()
   return (
@@ -298,10 +337,10 @@ function CalLeave({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void
         <Row title={L('رصيد الإجازة الاعتيادية السنوي (أيام)', 'Annual leave allowance (days)')} hint={L('اتركه فارغاً لإخفاء الرصيد', 'Leave empty to hide the balance')}><input className="input" type="number" min={0} style={{ width: 110 }} value={s.leaveAllowance ?? ''} onChange={e => set({ leaveAllowance: e.target.value === '' ? null : Math.max(0, +e.target.value) })} /></Row>
         <Row title={L('أيام مرحّلة من العام السابق', 'Carried-over days')}><input className="input" type="number" min={0} style={{ width: 110 }} value={s.leaveCarryOver} onChange={e => set({ leaveCarryOver: Math.max(0, +e.target.value || 0) })} /></Row>
         <Row title={L('بداية سنة الإجازات', 'Leave year starts')} hint="MM-DD"><input className="input ltr" style={{ width: 110, display: 'block' }} value={s.leaveYearStart} onChange={e => /^\d{2}-\d{2}$/.test(e.target.value) && set({ leaveYearStart: e.target.value })} /></Row>
-        <Row title={L('احتساب عطلة نهاية الأسبوع في الإجازات الأخرى', 'Count weekends in other leave types')} hint={L('الإجازة الاعتيادية تحتسب عطلة نهاية الأسبوع دائماً إذا وقعت ضمن فترتها.', 'Annual leave always counts the weekend days it covers.')}><Switch label="w" checked={s.leaveCountWeekends} onChange={v => set({ leaveCountWeekends: v })} /></Row>
         <Row title={L('احتساب العطل الرسمية ضمن أيام الإجازة', 'Count public holidays as leave days')}><Switch label="h" checked={s.leaveCountHolidays} onChange={v => set({ leaveCountHolidays: v })} /></Row>
         <p className="tiny muted" style={{ marginBottom: 0 }}>{L('تختلف قواعد الاحتساب حسب جهة العمل ونوع الإجازة — اضبطها وفق اللائحة المطبقة عليك.', 'Counting rules differ by employer and leave type — set them to match your applicable policy.')}</p>
       </Card>
+      <LeaveTypesCard s={s} set={set} />
       <Card title={L('العطل الرسمية', 'Official holidays')}>
         <Row title={L('بيانات العطل ومصادرها وحالة التحقق', 'Holiday data, sources and verification')}><button className="btn sm" onClick={() => go('leave')}>{L('فتح', 'Open')}</button></Row>
       </Card>
@@ -342,7 +381,7 @@ function Data() {
       await logout()
     }
     await Promise.all([...TABLES.map(t => (db as any)[t].clear()), db.local.clear()])
-    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded' && k !== 'df-ev-defaults' && k !== 'df-leave-recount') localStorage.removeItem(k)
+    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded' && k !== 'df-ev-defaults' && k !== 'df-leave-recount' && k !== 'df-leave-all') localStorage.removeItem(k)
     toast(L('حُذفت كل البيانات', 'All data deleted'))
     setTimeout(() => location.reload(), 900)
   }

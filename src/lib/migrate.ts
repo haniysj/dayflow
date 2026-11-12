@@ -1,14 +1,14 @@
-import { db, getSettings, saveMany } from './db'
+import { db, getSettings, saveMany, updateSettings } from './db'
 import { DEMO_TITLES } from './seed'
 import { countLeaveDays, normSlots } from './logic'
 import { remSort, sameRem } from './reminders'
-import { PRIORITY_SLOTS } from './types'
+import { PRIORITY_SLOTS, type Leave } from './types'
 
 /**
  * Data-schema version. IndexedDB index changes go in DayFlowDB (db.version(n)); record-shape changes go here.
  * Each step must be idempotent. Backups record the schema they were written with.
  */
-export const CURRENT_SCHEMA = 5
+export const CURRENT_SCHEMA = 6
 
 const steps: Record<number, () => Promise<void>> = {
   1: async () => {
@@ -33,6 +33,26 @@ const steps: Record<number, () => Promise<void>> = {
     for (const d of days) if ((d.priorities || []).length !== PRIORITY_SLOTS) await db.days.put({ ...d, priorities: normSlots(d.priorities) })
   },
   5: async () => { await recountAnnualLeave() },
+  6: async () => { await countAllLeaveDays() },
+}
+
+/**
+ * Leave counts every day from the first to the last (weekends and public holidays included).
+ * Switch the counting settings on and recount saved leave whose day count was automatic.
+ */
+export async function countAllLeaveDays() {
+  const before = await getSettings()
+  const after = { ...before, leaveCountWeekends: true, leaveCountHolidays: true, leaveTypes: before.leaveTypes?.map(t => ({ ...t, countWeekends: true })) }
+  await updateSettings({ leaveCountWeekends: true, leaveCountHolidays: true, ...(before.leaveTypes ? { leaveTypes: after.leaveTypes } : {}) })
+  const holidays = (await db.holidays.toArray()).filter(h => !h.deleted)
+  const rows = (await db.leaves.toArray()).filter(l => !l.deleted)
+  // a saved count equal to what any earlier counting rule gave was automatic; anything else was typed by hand and is kept
+  const oldRules = [false, true].flatMap(w => [false, true].map(h => ({ ...before, leaveCountWeekends: w, leaveCountHolidays: h, leaveTypes: undefined })))
+  const wasAuto = (l: Leave) => oldRules.some(r => l.workingDays === countLeaveDays(l.start, l.end, r, holidays))
+  const changed = rows.filter(wasAuto)
+    .map(l => ({ ...l, workingDays: countLeaveDays(l.start, l.end, after, holidays, l.type) }))
+    .filter(l => l.workingDays !== rows.find(r => r.id === l.id)!.workingDays)
+  if (changed.length) await saveMany('leaves', changed)
 }
 
 /** Annual leave now counts the weekend days inside it: recount saved annual leave whose day count was automatic */

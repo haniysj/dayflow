@@ -138,7 +138,10 @@ export interface DayRecord extends Base {
   planned?: ID[] // tasks planned for this day at "plan tomorrow" time (for planned-vs-completed)
 }
 
-export type LeaveType = 'annual' | 'sick' | 'emergency' | 'unpaid' | 'study' | 'other'
+/** Built-in ids: annual | sick | emergency | unpaid | study | other; custom types use their own ids */
+export type LeaveType = string
+/** A leave type as edited in Settings. `name` empty = the built-in label in the current language. */
+export interface LeaveTypeDef { id: string; name?: string; countWeekends: boolean; hidden?: boolean }
 
 export interface Leave extends Base {
   type: LeaveType
@@ -207,6 +210,8 @@ export interface Settings {
   leaveCountWeekends: boolean
   leaveCountHolidays: boolean
   leaveCarryOver: number
+  /** editable leave types (absent = the built-in list) */
+  leaveTypes?: LeaveTypeDef[]
   reviewQuestions: string[]
   onboarded: boolean
 }

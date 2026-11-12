@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { useApp } from '../app-context'
 import { addDays, addMonths, dow, endOfMonth, fmtDay, fmtMonth, fmtShort, range, startOfMonth, startOfWeek, todayStr, weekdayName } from '../lib/dates'
 import { useEvents, useHolidays, useLeaves } from '../lib/db'
-import { getLang, L, LEAVE_TYPE_LABEL } from '../lib/i18n'
+import { getLang, L } from '../lib/i18n'
+import { leaveTypeName } from '../lib/leaveTypes'
 import { expandEvents } from '../lib/logic'
 import { pageMM, printPages, savePdf, type Orient } from '../lib/printPdf'
 import { FileIcon, Modal, PrintIcon, Seg, Switch } from './ui'
@@ -169,7 +170,7 @@ function YearPage({ months, opts }: { months: string[]; opts: Opts }) {
       const days = range(x.start, x.end).filter(inMonths)
       if (!days.length) continue
       days.forEach(d => lv.add(d))
-      list.push({ from: x.start, to: x.end, name: (LEAVE_TYPE_LABEL() as any)[x.type] || L('إجازة', 'Leave'), c: '#8A6100' })
+      list.push({ from: x.start, to: x.end, name: leaveTypeName(settings, x.type), c: '#8A6100' })
     }
     if (opts.events) for (const e of expandEvents(events.filter(e => e.type !== 'break'), from, to, settings.workdays)) ev.add(e.instanceDate)
     list.sort((a, b) => a.from.localeCompare(b.from))

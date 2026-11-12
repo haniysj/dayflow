@@ -6,7 +6,8 @@ import {
   addDays, addMonths, dow, endOfMonth, fmtMonth, fmtShort, fmtTime, hijri, monthShort, range, startOfMonth, startOfWeek, todayStr, weekdayName,
 } from '../lib/dates'
 import { useEvents, useHolidays, useLeaves, useTasks } from '../lib/db'
-import { getLang, L, LEAVE_TYPE_LABEL } from '../lib/i18n'
+import { getLang, L } from '../lib/i18n'
+import { leaveTypeName } from '../lib/leaveTypes'
 import { printPages, savePdf } from '../lib/printPdf'
 import { expandEvents } from '../lib/logic'
 import { FileIcon, Modal, PrintIcon, Seg, Switch } from './ui'
@@ -146,7 +147,7 @@ function PlannerPages({ sundays, opts }: { sundays: string[]; opts: Opts }) {
     const lv = leaves.filter(l => l.start <= d && l.end >= d)
     const tags = [
       ...hol.map(h => ({ t: (rtl || !h.nameEn ? h.name : h.nameEn) + (h.status === 'estimated' ? L(' (تقديري)', ' (est.)') : ''), c: h.official ? '#2E7D32' : '#AD3B7A' })),
-      ...lv.map(l => ({ t: (LEAVE_TYPE_LABEL() as any)[l.type], c: '#8A6100' })),
+      ...lv.map(l => ({ t: leaveTypeName(settings, l.type), c: '#8A6100' })),
     ]
     if (!opts.withItems) return { tags, items: [] as { time: string; text: string; done?: boolean; task?: boolean }[] }
     const ev = expandEvents(events.filter(e => e.type !== 'break'), d, d, settings.workdays)
