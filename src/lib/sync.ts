@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { addDefaultEventReminders } from './migrate'
+import { addDefaultEventReminders, recountAnnualLeave } from './migrate'
 import { db, onLocalChange, TABLES } from './db'
 import type { TableName } from './types'
 
@@ -84,6 +84,7 @@ export async function resetLocal() {
 /** After re-downloading everything, apply the one-off data updates that ran while the local copy was empty */
 async function afterFullPull() {
   localStorage.removeItem('df-cursor') // old location of the cursor
+  if (!localStorage.getItem('df-leave-recount')) { localStorage.setItem('df-leave-recount', '1'); await recountAnnualLeave() }
   if (localStorage.getItem('df-ev-defaults')) return
   localStorage.setItem('df-ev-defaults', '1')
   await addDefaultEventReminders()

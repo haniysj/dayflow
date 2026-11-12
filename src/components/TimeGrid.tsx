@@ -19,10 +19,43 @@ export interface GridItem {
 }
 export interface AllDayItem { key: string; title: string; color: string; est?: boolean; done?: boolean; onClick?: () => void }
 
+/** An item drawn as one continuous bar from `start` to `end` (inclusive dates) */
+export interface SpanItem extends AllDayItem { start: string; end: string; rank: number; ord?: number }
+
+export interface SpanBar { item: SpanItem; c1: number; c2: number; lane: number; before: boolean; after: boolean }
+
+/**
+ * Lay out bars over a run of consecutive dates (one calendar week row, or a week/day column set).
+ * Longer and earlier items get the top lanes; items beyond `maxLanes` are counted per column as hidden.
+ */
+export function layoutSpans(items: SpanItem[], dates: string[], maxLanes: number) {
+  const first = dates[0], last = dates[dates.length - 1]
+  const col = (d: string) => dates.indexOf(d)
+  const inRange = items.filter(i => i.end >= first && i.start <= last)
+    .sort((a, b) => a.rank - b.rank || a.start.localeCompare(b.start) || b.end.localeCompare(a.end) || (a.ord ?? 0) - (b.ord ?? 0) || a.title.localeCompare(b.title))
+  const occ: boolean[][] = []
+  const bars: SpanBar[] = []
+  const hidden = dates.map(() => 0)
+  for (const item of inRange) {
+    const c1 = item.start < first ? 0 : col(item.start)
+    const c2 = item.end > last ? dates.length - 1 : col(item.end)
+    if (c1 < 0 || c2 < 0) continue
+    let lane = 0
+    while ((occ[lane] ||= []).slice(c1, c2 + 1).some(Boolean)) lane++
+    if (lane >= maxLanes) { for (let c = c1; c <= c2; c++) hidden[c]++; continue }
+    for (let c = c1; c <= c2; c++) occ[lane][c] = true
+    bars.push({ item, c1, c2, lane, before: item.start < first, after: item.end > last })
+  }
+  return { bars, hidden, lanes: Math.min(maxLanes, occ.length) }
+}
+
+
 interface Props {
   dates: string[]
   items: GridItem[]
   allDay?: Record<string, AllDayItem[]>
+  /** when given, all-day items are drawn as continuous bars across the columns */
+  spans?: SpanItem[]
   startHour: number
   endHour: number
   slotMin: number
@@ -113,7 +146,25 @@ export function TimeGrid(p: Props) {
           })}
         </div>
       )}
-      {p.allDay && Object.values(p.allDay).some(a => a.length) && (
+      {p.spans && (() => {
+        const { bars, hidden, lanes } = layoutSpans(p.spans, p.dates, 4)
+        if (!bars.length && !hidden.some(Boolean)) return null
+        const rows = lanes + (hidden.some(Boolean) ? 1 : 0)
+        return (
+          <div className="allday" style={style}>
+            <div className="tiny muted" style={{ textAlign: 'center', padding: '6px 0' }}>{L('اليوم كله', 'All day')}</div>
+            <div className="allday-lanes" style={{ gridTemplateColumns: `repeat(${p.dates.length}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, auto)` }}>
+              {p.dates.map((d, i) => <div key={d} className="allday-cell" style={{ gridColumn: i + 1, gridRow: '1 / -1' }} />)}
+              {bars.map(b => (
+                <button key={b.item.key} className={`chip mbar${b.item.est ? ' est' : ''}${b.item.done ? ' done' : ''}${b.before ? ' cb' : ''}${b.after ? ' ca' : ''}`}
+                  style={{ ['--c' as any]: b.item.color, gridColumn: `${b.c1 + 1} / ${b.c2 + 2}`, gridRow: b.lane + 1 }} onClick={b.item.onClick} title={b.item.title}>{b.item.title}</button>
+              ))}
+              {hidden.map((n, i) => n > 0 && <button key={'m' + i} className="more" style={{ gridColumn: i + 1, gridRow: lanes + 1 }} onClick={() => p.onHeadClick?.(p.dates[i])}>+{n}</button>)}
+            </div>
+          </div>
+        )
+      })()}
+      {!p.spans && p.allDay && Object.values(p.allDay).some(a => a.length) && (
         <div className="allday" style={style}>
           <div className="tiny muted" style={{ textAlign: 'center', padding: '6px 0' }}>{L('اليوم كله', 'All day')}</div>
           {p.dates.map(d => (

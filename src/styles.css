@@ -226,6 +226,16 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 /* ---------- month ---------- */
 .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-inline-start: 1px solid var(--line); }
 .month .mh { padding: 6px 4px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--muted); border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--soft); }
+.month > .mweek { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: 30px repeat(var(--lanes, 3), 21px) minmax(18px, 1fr); min-height: 112px; row-gap: 2px; }
+.mweek > .mcell { grid-row: 1 / -1; min-height: 0; }
+.mweek > .mbar { z-index: 1; align-self: center; margin: 0 3px; width: auto; }
+.mweek > .more { z-index: 1; padding: 0 5px; pointer-events: none; }
+.mbar.cb { margin-inline-start: 0 !important; border-start-start-radius: 0; border-end-start-radius: 0; }
+.mbar.ca { margin-inline-end: 0 !important; border-start-end-radius: 0; border-end-end-radius: 0; }
+.allday-lanes { grid-column: 2 / -1; display: grid; row-gap: 2px; padding: 3px 0; position: relative; }
+.allday-lanes > .allday-cell { padding: 0; }
+.allday-lanes > .mbar { z-index: 1; margin: 0 3px; width: auto; }
+.allday-lanes > .more { z-index: 1; background: none; border: 0; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer; text-align: start; padding: 0 6px; }
 .mcell { min-height: 108px; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 4px; display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer; transition: background .15s; }
 .mcell:hover { background: var(--soft); }
 .mcell.out { opacity: .45; }
@@ -235,6 +245,8 @@ input[type="date"].input, input[type="time"].input { direction: ltr; text-align:
 .mcell .more { font-size: 11.5px; color: var(--muted); font-weight: 700; }
 @media (max-width: 699px) {
   .mcell { min-height: 64px; padding: 2px; }
+  .month > .mweek { grid-template-rows: 26px repeat(var(--lanes, 2), 17px) minmax(14px, 1fr); min-height: 78px; row-gap: 1px; }
+  .mweek > .mbar { margin: 0 1px; }
   .mcell .chip { font-size: 10.5px; padding: 0 4px; }
   .mcell .dn { width: 22px; height: 22px; font-size: 12px; }
 }

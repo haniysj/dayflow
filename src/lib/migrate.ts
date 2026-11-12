@@ -1,6 +1,6 @@
-import { db, saveMany } from './db'
+import { db, getSettings, saveMany } from './db'
 import { DEMO_TITLES } from './seed'
-import { normSlots } from './logic'
+import { countLeaveDays, normSlots } from './logic'
 import { remSort, sameRem } from './reminders'
 import { PRIORITY_SLOTS } from './types'
 
@@ -8,7 +8,7 @@ import { PRIORITY_SLOTS } from './types'
  * Data-schema version. IndexedDB index changes go in DayFlowDB (db.version(n)); record-shape changes go here.
  * Each step must be idempotent. Backups record the schema they were written with.
  */
-export const CURRENT_SCHEMA = 4
+export const CURRENT_SCHEMA = 5
 
 const steps: Record<number, () => Promise<void>> = {
   1: async () => {
@@ -32,6 +32,20 @@ const steps: Record<number, () => Promise<void>> = {
     const days = await db.days.toArray()
     for (const d of days) if ((d.priorities || []).length !== PRIORITY_SLOTS) await db.days.put({ ...d, priorities: normSlots(d.priorities) })
   },
+  5: async () => { await recountAnnualLeave() },
+}
+
+/** Annual leave now counts the weekend days inside it: recount saved annual leave whose day count was automatic */
+export async function recountAnnualLeave() {
+  const settings = await getSettings()
+  const holidays = (await db.holidays.toArray()).filter(h => !h.deleted)
+  const rows = (await db.leaves.toArray()).filter(l => !l.deleted && l.type === 'annual')
+  const changed = rows.filter(l => {
+    const before = countLeaveDays(l.start, l.end, settings, holidays) // the old rule (no leave type)
+    const now = countLeaveDays(l.start, l.end, settings, holidays, 'annual')
+    return l.workingDays === before && now !== before
+  }).map(l => ({ ...l, workingDays: countLeaveDays(l.start, l.end, settings, holidays, 'annual') }))
+  if (changed.length) await saveMany('leaves', changed)
 }
 
 /** Events get the evening-before and morning-of alerts (existing reminders are kept; breaks are skipped) */

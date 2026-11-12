@@ -36,7 +36,7 @@ export function LeavePage() {
           <div className="kpi"><b style={{ color: remaining != null && remaining < 0 ? 'var(--rose)' : 'var(--teal)' }}>{remaining ?? '—'}</b><span>{L('المتبقي', 'Remaining')}</span></div>
         </div>
         {allowance != null && <div className="hbar" style={{ marginTop: 12 }}><div style={{ width: `${Math.min(100, ((used + booked) / Math.max(1, allowance)) * 100)}%` }} /></div>}
-        <p className="tiny muted" style={{ margin: '8px 0 0' }}>{L(`يُحسب عدد الأيام حسب إعداداتك: ${settings.leaveCountWeekends ? 'تُحتسب' : 'لا تُحتسب'} عطلة نهاية الأسبوع، و${settings.leaveCountHolidays ? 'تُحتسب' : 'لا تُحتسب'} العطل الرسمية. عدّلها من الإعدادات وفق سياسة جهة عملك.`, `Days are counted per your settings: weekends ${settings.leaveCountWeekends ? 'count' : 'do not count'}, public holidays ${settings.leaveCountHolidays ? 'count' : 'do not count'}. Adjust in Settings to match your employer’s policy.`)}</p>
+        <p className="tiny muted" style={{ margin: '8px 0 0' }}>{L(`الإجازة الاعتيادية تُحتسب فيها أيام عطلة نهاية الأسبوع التي تقع ضمن فترتها، و${settings.leaveCountHolidays ? 'تُحتسب' : 'لا تُحتسب'} العطل الرسمية (من الإعدادات).`, `Annual leave counts the weekend days it covers; public holidays ${settings.leaveCountHolidays ? 'count' : 'do not count'} (see Settings).`)}</p>
       </section>
 
       <section className="card">
@@ -52,7 +52,7 @@ export function LeavePage() {
                 <b>{(LEAVE_TYPE_LABEL() as any)[l.type]}</b>
                 <div className="row wrap" style={{ gap: 5 }}>
                   <span className="small iso nowrap">{fmtShort(l.start)} – {fmtShort(l.end)}</span>
-                  <span className="pill">{l.workingDays} {L('أيام عمل', 'working days')}</span>
+                  <span className="pill">{l.workingDays} {l.workingDays > 10 ? L('يوماً', 'days') : L('أيام', 'days')}</span>
                   <span className={`pill${l.start <= today && l.end >= today ? ' teal' : ''}`}>{status}</span>
                   {l.demo && <span className="pill outline">{L('تجريبي', 'Demo')}</span>}
                 </div>
@@ -73,10 +73,10 @@ export function LeavePage() {
 function LeaveEditor({ leave, holidays, onClose }: { leave: Leave; holidays: Holiday[]; onClose: () => void }) {
   const { settings } = useApp()
   const [l, setL] = useState(leave)
-  const [manual, setManual] = useState(!!leave.updatedAt && leave.workingDays !== countLeaveDays(leave.start, leave.end, settings, holidays))
+  const [manual, setManual] = useState(!!leave.updatedAt && leave.workingDays !== countLeaveDays(leave.start, leave.end, settings, holidays, leave.type))
   const [prep, setPrep] = useState<string[]>([])
   const isNew = !leave.updatedAt
-  const auto = countLeaveDays(l.start, l.end, settings, holidays)
+  const auto = countLeaveDays(l.start, l.end, settings, holidays, l.type)
   const days = manual ? l.workingDays : auto
   const submit = async () => {
     if (!l.start || !l.end || l.end < l.start) return toast(L('تحقق من التواريخ', 'Check the dates'), { err: true })
@@ -109,7 +109,7 @@ function LeaveEditor({ leave, holidays, onClose }: { leave: Leave; holidays: Hol
         <label className="field"><span>{L('إلى', 'To')}</span><input className="input" type="date" value={l.end} min={l.start} onChange={e => setL({ ...l, end: e.target.value })} /></label>
       </div>
       <div className="banner info" style={{ alignItems: 'center' }}>
-        <div className="grow"><b>{days}</b> {L('أيام عمل', 'working days')} <span className="tiny muted">({L('تلقائي:', 'auto:')} {auto})</span></div>
+        <div className="grow"><b>{days}</b> {days > 10 ? L('يوماً', 'days') : L('أيام', 'days')} {l.type === 'annual' ? <span className="tiny muted">{L('(تشمل عطلة نهاية الأسبوع داخل الفترة)', '(includes weekends inside the period)')}</span> : null} <span className="tiny muted">({L('تلقائي:', 'auto:')} {auto})</span></div>
         <label className="check small"><input type="checkbox" checked={manual} onChange={e => { setManual(e.target.checked); setL({ ...l, workingDays: auto }) }} />{L('تعديل يدوي', 'Override')}</label>
         {manual && <input className="input" type="number" min={0} style={{ width: 80 }} value={l.workingDays} onChange={e => setL({ ...l, workingDays: Math.max(0, +e.target.value) })} aria-label={L('عدد الأيام', 'Days')} />}
       </div>

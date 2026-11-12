@@ -1,7 +1,7 @@
 import { addDays, addMonths, diffDays, dow, range, todayStr } from './dates'
 import { db, patch, save, uid } from './db'
 import { PRIORITY_SLOTS } from './types'
-import type { CalEvent, Holiday, PrioritySlot, Recurrence, Settings, Task } from './types'
+import type { CalEvent, Holiday, LeaveType, PrioritySlot, Recurrence, Settings, Task } from './types'
 
 // ---------- recurrence ----------
 export function occursOn(start: string, rule: Recurrence, day: string, workdays?: number[]): boolean {
@@ -141,11 +141,13 @@ export function holidayDates(holidays: Holiday[]) {
   return s
 }
 
-export function countLeaveDays(start: string, end: string, settings: Settings, holidays: Holiday[]) {
+/** Leave days in a range. Annual leave always counts the weekend days it covers; other types follow the setting. */
+export function countLeaveDays(start: string, end: string, settings: Settings, holidays: Holiday[], type?: LeaveType) {
   if (!start || !end || end < start) return 0
   const hd = holidayDates(holidays)
+  const weekends = type === 'annual' || settings.leaveCountWeekends
   return range(start, end).filter(d => {
-    if (!settings.leaveCountWeekends && !settings.workdays.includes(dow(d))) return false
+    if (!weekends && !settings.workdays.includes(dow(d))) return false
     if (!settings.leaveCountHolidays && hd.has(d)) return false
     return true
   }).length

@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Filter, MapPin, Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../app-context'
-import { ALL_TYPES, buildCalendar, moveGridItem, scheduleTaskAt, type CalFilter } from '../components/calendarData'
+import { ALL_TYPES, buildCalendar, layoutSpans, moveGridItem, scheduleTaskAt, type CalFilter, type SpanItem } from '../components/calendarData'
 import { typeColor } from '../components/EventEditor'
 import { TimeGrid } from '../components/TimeGrid'
 import { catName, DateBadge, Empty, FileIcon, PrintIcon, Seg } from '../components/ui'
@@ -15,6 +15,8 @@ import { EVENT_TYPE_LABEL, L } from '../lib/i18n'
 import { exportICS } from '../lib/io'
 
 type CalView = 'day' | 'workweek' | 'week' | 'month' | 'agenda'
+
+const weeksOf = (dates: string[]) => Array.from({ length: Math.ceil(dates.length / 7) }, (_, i) => dates.slice(i * 7, i * 7 + 7))
 
 export function CalendarPage() {
   const { settings, quickAdd, go, params } = useApp()
@@ -136,7 +138,7 @@ export function CalendarPage() {
       {(view === 'day' || view === 'week' || view === 'workweek') && (
         <div className="card" style={{ padding: 0, overflow: 'clip' }}>
           {view === 'day' && <div className="row" style={{ padding: '10px 14px', borderBottom: '1px solid var(--line)' }}><DateBadge date={cursor} sm /><b>{relDay(cursor)}</b>{!settings.workdays.includes(dow(cursor)) && <span className="pill">{L('عطلة نهاية الأسبوع', 'Weekend')}</span>}</div>}
-          <TimeGrid dates={dates} items={data.timed} allDay={data.allDay} startHour={settings.dayStart} endHour={settings.dayEnd} slotMin={settings.slotMin} workdays={settings.workdays}
+          <TimeGrid dates={dates} items={data.timed} allDay={data.allDay} spans={data.spans} startHour={settings.dayStart} endHour={settings.dayEnd} slotMin={settings.slotMin} workdays={settings.workdays}
             onSlot={(d, time) => quickAdd({ kind: 'event', date: d, time })}
             onOpen={openItem}
             onMove={(it, d, s, e) => moveGridItem(it, d, s, e)}
@@ -149,15 +151,24 @@ export function CalendarPage() {
         <div className="card" style={{ padding: 0, overflow: 'clip' }}>
           <div className="month" role="grid" aria-label={fmtMonth(cursor)}>
             {dates.slice(0, 7).map(d => <div key={d} className="mh" role="columnheader">{weekdayName(d, window.innerWidth < 700 ? 'narrow' : 'short')}</div>)}
-            {dates.map(d => {
-              const items = [...(data.allDay[d] || []), ...data.timed.filter(i => i.date === d).sort((a, b) => a.start - b.start).map(i => ({ key: i.key, title: `${fmtTime(minToHM(i.start)).replace(':00', '')} ${i.title}`, color: i.color, done: i.done, onClick: () => openItem(i), est: false }))]
+            {weeksOf(dates).map(week => {
               const max = window.innerWidth < 700 ? 2 : 3
+              const timedSpans: SpanItem[] = data.timed.filter(i => week.includes(i.date)).map(i => ({ key: i.key, title: `${fmtTime(minToHM(i.start)).replace(':00', '')} ${i.title}`, color: i.color, done: i.done, onClick: () => openItem(i), start: i.date, end: i.date, rank: 3, ord: i.start }))
+              const { bars, hidden } = layoutSpans([...data.spans, ...timedSpans], week, max)
               return (
-                <div key={d} role="gridcell" className={`mcell${d.slice(0, 7) !== cursor.slice(0, 7) ? ' out' : ''}${!settings.workdays.includes(dow(d)) ? ' weekend' : ''}${d === today ? ' today' : ''}`}
-                  onClick={() => { setCursor(d); setV('day') }} aria-label={fmtLong(d)} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') { setCursor(d); setV('day') } }}>
-                  <span className="dn">{+d.slice(8)}</span>
-                  {items.slice(0, max).map(a => <button key={a.key} className={`chip${a.est ? ' est' : ''}${a.done ? ' done' : ''}`} style={{ ['--c' as any]: a.color }} title={a.title} onClick={e => { e.stopPropagation(); a.onClick?.() }}>{a.title}</button>)}
-                  {items.length > max && <span className="more">+{items.length - max}</span>}
+                <div key={week[0]} className="mweek" style={{ ['--lanes' as any]: max }}>
+                  {week.map((d, i) => (
+                    <div key={d} role="gridcell" style={{ gridColumn: i + 1 }} className={`mcell${d.slice(0, 7) !== cursor.slice(0, 7) ? ' out' : ''}${!settings.workdays.includes(dow(d)) ? ' weekend' : ''}${d === today ? ' today' : ''}`}
+                      onClick={() => { setCursor(d); setV('day') }} aria-label={fmtLong(d)} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') { setCursor(d); setV('day') } }}>
+                      <span className="dn">{+d.slice(8)}</span>
+                    </div>
+                  ))}
+                  {bars.map(b => (
+                    <button key={b.item.key} className={`chip mbar${b.item.est ? ' est' : ''}${b.item.done ? ' done' : ''}${b.before ? ' cb' : ''}${b.after ? ' ca' : ''}`}
+                      style={{ ['--c' as any]: b.item.color, gridColumn: `${b.c1 + 1} / ${b.c2 + 2}`, gridRow: b.lane + 2 }}
+                      title={b.item.title} onClick={e => { e.stopPropagation(); b.item.onClick?.() }}>{b.item.title}</button>
+                  ))}
+                  {hidden.map((n, i) => n > 0 && <span key={'m' + i} className="more" style={{ gridColumn: i + 1, gridRow: max + 2 }}>+{n}</span>)}
                 </div>
               )
             })}

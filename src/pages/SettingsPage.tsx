@@ -298,7 +298,7 @@ function CalLeave({ s, set }: { s: Settings; set: (c: Partial<Settings>) => void
         <Row title={L('رصيد الإجازة الاعتيادية السنوي (أيام)', 'Annual leave allowance (days)')} hint={L('اتركه فارغاً لإخفاء الرصيد', 'Leave empty to hide the balance')}><input className="input" type="number" min={0} style={{ width: 110 }} value={s.leaveAllowance ?? ''} onChange={e => set({ leaveAllowance: e.target.value === '' ? null : Math.max(0, +e.target.value) })} /></Row>
         <Row title={L('أيام مرحّلة من العام السابق', 'Carried-over days')}><input className="input" type="number" min={0} style={{ width: 110 }} value={s.leaveCarryOver} onChange={e => set({ leaveCarryOver: Math.max(0, +e.target.value || 0) })} /></Row>
         <Row title={L('بداية سنة الإجازات', 'Leave year starts')} hint="MM-DD"><input className="input ltr" style={{ width: 110, display: 'block' }} value={s.leaveYearStart} onChange={e => /^\d{2}-\d{2}$/.test(e.target.value) && set({ leaveYearStart: e.target.value })} /></Row>
-        <Row title={L('احتساب عطلة نهاية الأسبوع ضمن أيام الإجازة', 'Count weekends as leave days')}><Switch label="w" checked={s.leaveCountWeekends} onChange={v => set({ leaveCountWeekends: v })} /></Row>
+        <Row title={L('احتساب عطلة نهاية الأسبوع في الإجازات الأخرى', 'Count weekends in other leave types')} hint={L('الإجازة الاعتيادية تحتسب عطلة نهاية الأسبوع دائماً إذا وقعت ضمن فترتها.', 'Annual leave always counts the weekend days it covers.')}><Switch label="w" checked={s.leaveCountWeekends} onChange={v => set({ leaveCountWeekends: v })} /></Row>
         <Row title={L('احتساب العطل الرسمية ضمن أيام الإجازة', 'Count public holidays as leave days')}><Switch label="h" checked={s.leaveCountHolidays} onChange={v => set({ leaveCountHolidays: v })} /></Row>
         <p className="tiny muted" style={{ marginBottom: 0 }}>{L('تختلف قواعد الاحتساب حسب جهة العمل ونوع الإجازة — اضبطها وفق اللائحة المطبقة عليك.', 'Counting rules differ by employer and leave type — set them to match your applicable policy.')}</p>
       </Card>
@@ -342,7 +342,7 @@ function Data() {
       await logout()
     }
     await Promise.all([...TABLES.map(t => (db as any)[t].clear()), db.local.clear()])
-    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded' && k !== 'df-ev-defaults') localStorage.removeItem(k)
+    for (const k of Object.keys(localStorage)) if (k.startsWith('df-') && k !== 'df-seeded' && k !== 'df-ev-defaults' && k !== 'df-leave-recount') localStorage.removeItem(k)
     toast(L('حُذفت كل البيانات', 'All data deleted'))
     setTimeout(() => location.reload(), 900)
   }
